@@ -14,7 +14,7 @@ class ThermalNoise:
         self.n  = fbins
         self.nyq_freq = 1. / (2. * time_domain_sampling_rate)      
         if fmax > self.nyq_freq:
-            print 'class ThermalNoise::invalid fmax given input time_domain_sampling_rate'
+            print ('class ThermalNoise::invalid fmax given input time_domain_sampling_rate')
             return
 
         self.df= 2. * self.nyq_freq / fbins
@@ -30,7 +30,7 @@ class ThermalNoise:
             hipass_rolloff = 2 * filter_order[0]
             lopass_rolloff = 2 * filter_order[1]
 
-            for i in range(1,fbins/2+1):
+            for i in range(1,fbins//2+1):
                 self.amplitudes[i] = np.sqrt(1./(1+pow((fmin/f[i]),hipass_rolloff)) * \
                                              1./(1+pow((f[i]/fmax),lopass_rolloff)))
         if normalize:
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     plt.ylabel('V / $\sigma$')
     plt.xlabel('Time [ns]')
 
-    print 'making voltage histogram...'
+    print('making voltage histogram...')
     plt.figure()
     sample=50
     #plt.hist(np.real(mynoise[2][:, sample]), bins=np.arange(-6, 6.1, 0.1), normed=True, histtype='step')

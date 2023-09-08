@@ -5,8 +5,8 @@
 import myplot  #specific for running on UC midway cluster
 import matplotlib.pyplot as plt
 import numpy as np
-import constants
-import aso_geometry as anita
+from .constants import *
+from . import aso_geometry as anita
 
 antennas_per_ring = 24
 
@@ -20,7 +20,7 @@ def delay(phi, theta):
 
     delays =  -1.0 * ( (anita.x_ant * x_planewave) \
                        + (anita.y_ant * y_planewave) \
-                       + (anita.z_ant * z_planewave) ) / constants.c_light
+                       + (anita.z_ant * z_planewave) ) / c_light
 
     return delays - np.min(delays)
 
@@ -51,12 +51,12 @@ def getDelays(phi, theta, phi_sectors=range(1,17), verbose=True):
 
     useful_keys= sorted(useful.keys())
     #dump the info in an organized fashion:
-    print 'plane wave direction: phi =', phi, 'deg; theta =', theta, 'deg'
+    print ('plane wave direction: phi =', phi, 'deg; theta =', theta, 'deg')
     for i in useful_keys:
         #useful[i]-max(useful_delays)
         if verbose:
             #print i, '{0:.1f}'.format(useful[i]-max(useful_delays)), 'ns'
-            print i, '{0:.3f}'.format(useful[i]), 'ns'
+            print (i, '{0:.3f}'.format(useful[i]), 'ns')
     return useful
 
 def getAllDelays(phi, theta, phi_sectors=range(1,17)):
@@ -87,9 +87,9 @@ def plotDelayDictEvent(delay_dict, event):
     event is an integer
     '''
     if event in delay_dict:
-        print '------------'
-        print 'wave theta:', delay_dict[event]['theta']
-        print 'wave phi:  ', delay_dict[event]['phi']
+        print ('------------')
+        print ('wave theta:', delay_dict[event]['theta'])
+        print ('wave phi:  ', delay_dict[event]['phi'])
 
         phi_sectors=delay_dict[event]['delays'].keys()
         plt.figure()
@@ -106,7 +106,7 @@ def plotDelayDictEvent(delay_dict, event):
         plt.tight_layout()
         
     else:
-        print 'event specified is not in dataset'
+        print ('event specified is not in dataset')
 
 def makeDelayElevationPlot(phi=0.0, phi_sector=1, plot=True):
     '''
@@ -120,7 +120,7 @@ def makeDelayElevationPlot(phi=0.0, phi_sector=1, plot=True):
     phi_sector = int(phi_sector)
 
     if phi_sector < 1 or phi_sector > antennas_per_ring:
-        print 'no such phi-sector'
+        print ('no such phi-sector')
         return
 
     if plot:

@@ -13,7 +13,7 @@ ring_map = {
     'B'  : 1,
     'M'  : 2,
     'T'  : 3,}
-ring_map_inv = {v: k for k, v in ring_map.iteritems()}
+ring_map_inv = {v: k for k, v in ring_map.copy().items()}
     
 def loadImpulse(filename='impulse/triggerTF_02TH.txt'):
 
