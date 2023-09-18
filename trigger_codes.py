@@ -13,8 +13,8 @@ if __name__=='__main__':
     
     delays = payload.getRemappedDelays(phi, theta, [1,2,3,4])
 
-    print delays
-    print delays / aso_geometry.ritc_sample_step
+    print (delays)
+    print (delays / aso_geometry.ritc_sample_step)
 
     color = ['blue', 'green', 'red', 'black']
     label = ['bb', 'b', 'm', 't']

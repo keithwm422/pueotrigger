@@ -79,14 +79,15 @@ if __name__=='__main__':
             for i in range(num_of_events_per_snr_step):
                 event_noise = numpy.reshape(numpy.real(noise_list[j][2][i*waveforms.shape[0]*waveforms.shape[1]:i*waveforms.shape[0]*waveforms.shape[1]+\
                                                                          waveforms.shape[0]*waveforms.shape[1]]), (waveforms.shape[0], waveforms.shape[1], waveforms.shape[2]))
-            
+                
                 coh_sum, timebase_coh_sum  = trigger.coherentSum(waveforms*snr+event_noise, timebase, delays, ringmask=ringmask)
+                #print(coh_sum, timebase_coh_sum)
                 power,_ = trigger.powerSum(coh_sum/numpy.sqrt(waveforms.shape[0]*numpy.sum(ringmask)), window=window, step=step)
 
                 if numpy.max(power) > threshold[j]:
                     _hits = _hits+1
 
-            print snr, float(_hits)/num_of_events_per_snr_step
+            print (snr, float(_hits)/num_of_events_per_snr_step)
             hits.append(float(_hits)/num_of_events_per_snr_step)
 
         data_to_save.append(numpy.array(hits))

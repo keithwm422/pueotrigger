@@ -15,8 +15,8 @@ def coherentSum(waveforms, timebase, delays, downsample=False, ringmask=[1,1,1,1
     decimate_factor = int(aso_geometry.ritc_sample_step/((timebase[1]-timebase[0])))
 
     #downsample to ritc sampling, if input is upsampled:
-    if downsample == True:        
-        coh_sum = numpy.zeros(len(waveforms[0,0]) / decimate_factor)
+    if downsample == True:
+        coh_sum = numpy.zeros(int(len(waveforms[0,0]) / decimate_factor)) # choice to cast as int, so 333.333 becomes 333
         
         for i in range(waveforms.shape[0]):
             for j in range(waveforms.shape[1]):
@@ -48,13 +48,17 @@ def powerSum(coh_sum, window=32, step=16):
     calculate power summed over a length defined by 'window', overlapping at intervals defined by 'step'
     '''
     num_frames = int(math.floor((len(coh_sum)-window) / step))
-
-    coh_sum_squared = (coh_sum * coh_sum).astype(numpy.int)
+   # print(num_frames)
+    #print(window)
+    coh_sum_squared = (coh_sum * coh_sum).astype(numpy.int64)
+   # print(coh_sum_squared)
+    #print(coh_sum_squared.strides[0]*step)
+   #print(coh_sum_squared.strides[0])
     coh_sum_windowed = numpy.lib.stride_tricks.as_strided(coh_sum_squared, (num_frames, window),
-                                                          (coh_sum_squared.strides[0]*step, coh_sum_squared.strides[0]))
+                                                          (int(coh_sum_squared.strides[0]*step), coh_sum_squared.strides[0]))
     power = numpy.sum(coh_sum_windowed, axis=1)
 
-    return power.astype(numpy.float)/window, num_frames
+    return power.astype(numpy.float64)/window, num_frames
 
                 
 if __name__=='__main__':
@@ -67,7 +71,7 @@ if __name__=='__main__':
     impulse = payload.loadImpulse('impulse/triggerTF_02TH.txt')
     impulse = payload.prepImpulse(impulse)
 
-    print 'timestep of input pulse [ns]:', impulse.dt
+    print ('timestep of input pulse [ns]:', impulse.dt)
     
     delays = payload.getRemappedDelays(phi, theta, [1,2,3,4])
     waveforms, timebase,_ = payload.getPayloadWaveforms(phi, theta, [1,2,3,4], impulse, (eplane, hplane))

@@ -86,12 +86,12 @@ if __name__ == '__main__':
     plt.figure()
     a=np.where(thermal_noise.frequencies > 0.4)[0]
     #plt.hist(np.real(mynoise[0][:, a])/np.cos(np.angle(mynoise[0][:, a])), 50, normed=True, histtype='step')
-    plt.hist(np.abs(mynoise[0][:, a[0]])/(np.mean(abs(mynoise[0][:,a[0]]))*np.sqrt(2 / np.pi)), 50, normed=True, histtype='step', label='from freq. domain')
-    plt.hist(np.abs(np.fft.ifft(mynoise[2])[:,a[0]])/(np.mean(np.abs(np.fft.ifft(mynoise[2])[:,a[0]]))*np.sqrt(2 / np.pi)), 50, normed=True, histtype='step', label='inverse FFT from time-domain')
+    plt.hist(np.abs(mynoise[0][:, a[0]])/(np.mean(abs(mynoise[0][:,a[0]]))*np.sqrt(2 / np.pi)), 50, density=True, histtype='step', label='from freq. domain')
+    plt.hist(np.abs(np.fft.ifft(mynoise[2])[:,a[0]])/(np.mean(np.abs(np.fft.ifft(mynoise[2])[:,a[0]]))*np.sqrt(2 / np.pi)), 50, density=True, histtype='step', label='inverse FFT from time-domain')
 
     #print np.mean(abs(mynoise[0][:,a[0]]))*np.sqrt(2 / np.pi)
     #print np.mean(np.abs(np.fft.ifft(mynoise[2])[:,a[0]]))*np.sqrt(2 / np.pi)
-    x = np.linspace(0., 5., 1.e4)
+    x = np.linspace(0., 5., int(1.e4))
     r = scipy.stats.rayleigh.pdf(x)
     plt.plot(x, r, label='Rayleigh Distribution')
     plt.ylabel('PDF', size=16)
@@ -108,8 +108,8 @@ if __name__ == '__main__':
     plt.figure()
     sample=50
     #plt.hist(np.real(mynoise[2][:, sample]), bins=np.arange(-6, 6.1, 0.1), normed=True, histtype='step')
-    plt.hist(np.real(mynoise[2].flatten()), bins=np.arange(-6, 6.1, 0.1), normed=True, histtype='step')
-    x = np.linspace(-5., 5., 1.e4)
+    plt.hist(np.real(mynoise[2].flatten()), bins=np.arange(-6, 6.1, 0.1), density=True, histtype='step')
+    x = np.linspace(-5., 5., int(1.e4))
     g = np.exp(-0.5 * x**2 * vrms**-2) / (np.sqrt(2. * np.pi) * vrms)
     plt.plot(x, g, label='Normal Distribution')
     plt.yscale('log')

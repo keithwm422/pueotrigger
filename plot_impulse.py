@@ -21,7 +21,7 @@ for i,f in enumerate(files):
     impulse = payload.loadImpulse(f)
     impulse = payload.prepImpulse(impulse)
 
-    print 'timestep of input pulse [ns]:', impulse.dt
+    print('timestep of input pulse [ns]:', impulse.dt)
 
     plt.figure(1)
     plt.plot(impulse.time, impulse.voltage, label=label[i])
