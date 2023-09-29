@@ -8,8 +8,10 @@ import coherent_sum as trigger
 import noise
 
 #pick phi, theta (incoming wave angle)
-phi = 15
-theta = -10
+#phi = 15
+#theta = -10
+phi=numpy.arange(0,51,10)
+theta=numpy.arange(-40,10,4)
 
 ## angle scan not yet implemented
 #theta_range = numpy.arange(-40, 10, 4)
@@ -25,7 +27,7 @@ if __name__=='__main__':
         
     eplane, hplane = payload.beamPattern()
 
-    impulse = payload.loadImpulse('impulse/triggerTF_02TH.txt')
+    impulse = payload.loadImpulse('impulse/triggerTF_02TH.txt') # this is the freq db response of trigger. Can we load in the new PUEO antenna?
     impulse = payload.prepImpulse(impulse)
 
     ### pick phi sectors to include in trigger
@@ -37,7 +39,8 @@ if __name__=='__main__':
     ringmask=[1,1,1,1]
 
     ### pick power sum window
-    window=32
+    window = 32# number of samples in a window
+
     step=window/2
 
     ## number of events to throw per step
@@ -45,15 +48,32 @@ if __name__=='__main__':
     ## snr steps to scan
     snr_scan = numpy.arange(0.2, 4.0, 0.1)
 
-    
-    delays = payload.getRemappedDelays(phi, theta, phi_sectors)
-    waveforms, timebase, multiplier = payload.getPayloadWaveforms(phi, theta, phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True)
-
     ## thresholds picked from fits provided by generate_threshold_curves.py
     ## these are given as a list to match the number of noise profiles tested
     threshold = [4.2,4.0]
     #threshold = [6.8,6.3]
+    #delays,waveforms,timebase,mulitplier will be new array, with phi size on one axis and theta on the other?
+    print(phi.shape[0])
+    print(type(theta.shape))
+    delays=numpy.empty((phi.shape[0],theta.shape[0])) # declare shape based on theta and phi which are tuples
+    # access like delays[iphi,itheta] for example delays[1,12] 
+    waveforms=numpy.empty((phi.shape[0],theta.shape[0]))
+    timebase=numpy.empty((phi.shape[0],theta.shape[0]))
+    multiplier=numpy.empty((phi.shape[0],theta.shape[0]))
+    phi_i=0
+    theta_i=0
+    while phi_i<len(phi):
+        theta_i=0
+        while theta_i<len(theta):
+            delays[phi_i,theta_i]=payload.getRemappedDelays(phi[phi_i], theta[theta_i], phi_sectors) # generate the delays per phi sector, and for each incoming wave angle phi[phi_i] and theta[theta_i]
+            waveforms[phi_i,theta_i], timebase[phi_i,theta_i], multiplier[phi_i,theta_i] = payload.getPayloadWaveforms(phi[phi_i], theta[theta_i], phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True) # find the waveform at the payload for each
 
+            theta_i+=1
+        phi_i+=1
+    
+    #delays = payload.getRemappedDelays(phi, theta, phi_sectors)
+    # all of these also will need to get bigger to array sizes given by phi and theta sizes?
+    #waveforms, timebase, multiplier = payload.getPayloadWaveforms(phi, theta, phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True)
     ## noise profile 1
     #thermal_noise_v1 = noise.ThermalNoise(0.26, 0.9, filter_order=(10,6), v_rms=1.0, 
     #                                   fbins=waveforms.shape[2], 

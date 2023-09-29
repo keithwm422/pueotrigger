@@ -163,7 +163,7 @@ def getPayloadWaveforms(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, 
 def downsamplePayload(time, trigger_waves):
 
     decimate_factor = int(aso_geometry.ritc_sample_step/((time[1]-time[0])))
-
+    print('decimate factor: ', decimate_factor)
     trigger_waves = trigger_waves[:,:,::decimate_factor]
     time = time[::decimate_factor]
 
