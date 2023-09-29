@@ -61,23 +61,6 @@ if __name__=='__main__':
     waveforms=numpy.empty((phi.shape[0],theta.shape[0]))
     timebase=numpy.empty((phi.shape[0],theta.shape[0]))
     multiplier=numpy.empty((phi.shape[0],theta.shape[0]))
-
-    thermal_noise_v1=numpy.empty((phi.shape[0],theta.shape[0]))
-    thermal_noise_v2=numpy.empty((phi.shape[0],theta.shape[0]))
-    ## noise profile 1
-    #thermal_noise_v1 = noise.ThermalNoise(0.26, 0.9, filter_order=(10,6), v_rms=1.0, 
-    #                                   fbins=waveforms.shape[2], 
-    #                                   time_domain_sampling_rate=aso_geometry.ritc_sample_step)
-
-    ## noise profile 2
-    #thermal_noise_v2 = noise.ThermalNoise(0.26, 1.05, filter_order=(10,10), v_rms=1.0, 
-    #                                   fbins=waveforms.shape[2], 
-    #                                   time_domain_sampling_rate=aso_geometry.ritc_sample_step)
-
-    noise_list=[] # list which now has entries that are different sizes...
-    #noise_list.append(thermal_noise_v1.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms.shape[0]*waveforms.shape[1]))
-    noise_list.append(thermal_noise_v2.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms.shape[0]*waveforms.shape[1]))
-
     # we can loop over all incoming wave angles.
     phi_i=0
     theta_i=0
@@ -86,15 +69,36 @@ if __name__=='__main__':
         while theta_i<len(theta):
             delays[phi_i,theta_i]=payload.getRemappedDelays(phi[phi_i], theta[theta_i], phi_sectors) # generate the delays per phi sector, and for each incoming wave angle phi[phi_i] and theta[theta_i]
             waveforms[phi_i,theta_i], timebase[phi_i,theta_i], multiplier[phi_i,theta_i] = payload.getPayloadWaveforms(phi[phi_i], theta[theta_i], phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True) # find the waveform at the payload for each
-            thermal_noise_v1[phi_i,theta_i] = noise.ThermalNoise(0.26, 0.9, filter_order=(10,6), v_rms=1.0, fbins=waveforms[phi_i,theta_i].shape[2], time_domain_sampling_rate=aso_geometry.ritc_sample_step)
-            thermal_noise_v2[phi_i,theta_i] = noise.ThermalNoise(0.26, 1.05, filter_order=(10,10), v_rms=1.0, fbins=waveforms[phi_i,theta_i].shape[2], time_domain_sampling_rate=aso_geometry.ritc_sample_step)
             theta_i+=1
         phi_i+=1
     
     #delays = payload.getRemappedDelays(phi, theta, phi_sectors)
     # all of these also will need to get bigger to array sizes given by phi and theta sizes?
     #waveforms, timebase, multiplier = payload.getPayloadWaveforms(phi, theta, phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True)
-    
+
+    # only need one thermal noise generatd for all angles (but version might be different, newer versions too?)
+    # All waveforms have same waveforms.shape so just use first one
+    ## noise profile 1
+    #thermal_noise_v1 = noise.ThermalNoise(0.26, 0.9, filter_order=(10,6), v_rms=1.0, 
+    #                                   fbins=waveforms[0,0].shape[2], 
+    #                                   time_domain_sampling_rate=aso_geometry.ritc_sample_step)
+
+    ## noise profile 2
+    thermal_noise_v2 = noise.ThermalNoise(0.26, 1.05, filter_order=(10,10), v_rms=1.0, 
+                                       fbins=waveforms[0,0].shape[2], 
+                                       time_domain_sampling_rate=aso_geometry.ritc_sample_step)
+
+    noise_list=[] # list which now has entries that are different sizes...
+    #noise_list.append(thermal_noise_v1.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms.shape[0]*waveforms.shape[1]))
+    noise_list.append(thermal_noise_v2.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms[0,0].shape[0]*waveforms[0,0].shape[1]))
+
+    # first pick phi_i and theta_i for testing...
+    myphi=15
+    mytheta=-10
+    phi_index=(numpy.abs(phi-myphi)).argmin
+    theta_index=(numpy.abs(theta-mytheta)).argmin
+    print('your phi: ', phi[phi_index])
+    print('your theta: ', theta[theta_index])
     for j in range(len(noise_list)):
         hits=[]
         for snr in snr_scan:
