@@ -108,11 +108,17 @@ if __name__=='__main__':
     mytheta=-10
     phi_index=numpy.argmin(numpy.abs(phi-myphi))
     theta_index=numpy.argmin(numpy.abs(theta-mytheta))
-    #phi_i=0 and theta_i =0 is waveforms_list[0], phi_i=0 and theta_i=1 would be waveforms_list[1], phi_i=1 and theta_i=0 would be waveforms_list[len(theta)-1] so (phi_index(len_theta))-1 + theta_index
+    #phi_i=0 and theta_i =0 is waveforms_list[0], phi_i=0 and theta_i=1 would be waveforms_list[1], phi_i=1 and theta_i=0 would be waveforms_list[len(theta)] so (phi_index(len_theta)) + theta_index
     print(phi_index)
     print('your phi: ', phi[phi_index])
+    print('phi index is: ', phi_index)
     print('your theta: ', theta[theta_index])
-    waveforms_index=(phi_index*len(theta))-1 + theta_index
+    print('theta index is: ', theta_index)
+    print('waveforms list length is: ',len(waveforms_list))
+    waveforms_index=(phi_index*len(theta)) + theta_index
+    print('waveform index: ', waveforms_index)
+    print(phi)
+    print(theta)
     for j in range(len(noise_list)):
         hits=[]
         for snr in snr_scan:
@@ -132,10 +138,10 @@ if __name__=='__main__':
             hits.append(float(_hits)/num_of_events_per_snr_step)
 
         data_to_save.append(numpy.array(hits))
-        data_to_save.append(numpy.array(hits)*(numpy.max(multiplier)))
+        data_to_save.append(numpy.array(hits)*(numpy.max(multiplier_list[waveforms_index])))
                               
         plt.plot(snr_scan, hits)
-        plt.plot(snr_scan*(numpy.max(multiplier)), hits)
+        plt.plot(snr_scan*(numpy.max(multiplier_list[waveforms_index])), hits)
 
     plt.ylim([-.1,1.1])
     plt.grid(True)
