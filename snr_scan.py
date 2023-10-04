@@ -56,7 +56,7 @@ if __name__=='__main__':
     #delays,waveforms,timebase,mulitplier will be new array, with phi size on one axis and theta on the other?
     print(phi.shape[0])
     print(type(theta.shape))
-    delays=numpy.empty((phi.shape[0],theta.shape[0])) # declare shape based on theta and phi which are tuples
+    #delays=numpy.empty((phi.shape[0],theta.shape[0])) # declare shape based on theta and phi which are tuples
     # access like delays[iphi,itheta] for example delays[1,12]
 
     #waveforms=numpy.empty((phi.shape[0],theta.shape[0]))
@@ -76,13 +76,33 @@ if __name__=='__main__':
             delays=payload.getRemappedDelays(phi[phi_i], theta[theta_i], phi_sectors) # generate the delays per phi sector, and for each incoming wave angle phi[phi_i] and theta[theta_i]
             waveforms, timebase, multiplier = payload.getPayloadWaveforms(phi[phi_i], theta[theta_i], phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True) # find the waveform at the payload for each
             # must add to list for now
+            print('waveforms shape: ', waveforms.shape[0], ' ', waveforms.shape[1], ' ', waveforms.shape[2])
             delays_list.append(delays)
             waveforms_list.append(waveforms)
             timebase_list.append(timebase)
             multiplier_list.append(multiplier)
             theta_i+=1
         phi_i+=1
-    
+
+
+    # first pick phi_i and theta_i for testing...
+    myphi=15
+    mytheta=-10
+    phi_index=numpy.argmin(numpy.abs(phi-myphi))
+    theta_index=numpy.argmin(numpy.abs(theta-mytheta))
+    #phi_i=0 and theta_i =0 is waveforms_list[0], phi_i=0 and theta_i=1 would be waveforms_list[1], phi_i=1 and theta_i=0 would be waveforms_list[len(theta)] so (phi_index(len_theta)) + theta_index
+    print(phi_index)
+    print('your phi: ', phi[phi_index])
+    print('phi index is: ', phi_index)
+    print('your theta: ', theta[theta_index])
+    print('theta index is: ', theta_index)
+    print('waveforms list length is: ',len(waveforms_list))
+    waveforms_index=(phi_index*len(theta)) + theta_index
+    print('waveform index: ', waveforms_index)
+    print(phi)
+    print(theta)
+    waveforms=waveforms_list[waveforms_index]
+
     #delays = payload.getRemappedDelays(phi, theta, phi_sectors)
     # all of these also will need to get bigger to array sizes given by phi and theta sizes?
     #waveforms, timebase, multiplier = payload.getPayloadWaveforms(phi, theta, phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True)
@@ -103,22 +123,6 @@ if __name__=='__main__':
     #noise_list.append(thermal_noise_v1.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms.shape[0]*waveforms.shape[1]))
     noise_list.append(thermal_noise_v2.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms.shape[0]*waveforms.shape[1]))
 
-    # first pick phi_i and theta_i for testing...
-    myphi=15
-    mytheta=-10
-    phi_index=numpy.argmin(numpy.abs(phi-myphi))
-    theta_index=numpy.argmin(numpy.abs(theta-mytheta))
-    #phi_i=0 and theta_i =0 is waveforms_list[0], phi_i=0 and theta_i=1 would be waveforms_list[1], phi_i=1 and theta_i=0 would be waveforms_list[len(theta)] so (phi_index(len_theta)) + theta_index
-    print(phi_index)
-    print('your phi: ', phi[phi_index])
-    print('phi index is: ', phi_index)
-    print('your theta: ', theta[theta_index])
-    print('theta index is: ', theta_index)
-    print('waveforms list length is: ',len(waveforms_list))
-    waveforms_index=(phi_index*len(theta)) + theta_index
-    print('waveform index: ', waveforms_index)
-    print(phi)
-    print(theta)
     for j in range(len(noise_list)):
         hits=[]
         for snr in snr_scan:
