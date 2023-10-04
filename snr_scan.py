@@ -6,7 +6,7 @@ import tools.constants as constants
 import payload_signal as payload
 import coherent_sum as trigger
 import noise
-
+import copy
 #pick phi, theta (incoming wave angle)
 #phi = 15
 #theta = -10
@@ -27,8 +27,8 @@ if __name__=='__main__':
         
     eplane, hplane = payload.beamPattern()
 
-    impulse = payload.loadImpulse('impulse/triggerTF_02TH.txt') # this is the freq db response of trigger. Can we load in the new PUEO antenna?
-    impulse = payload.prepImpulse(impulse)
+    impulse_d = payload.loadImpulse('impulse/triggerTF_02TH.txt') # this is the freq db response of trigger. Can we load in the new PUEO antenna?
+    impulse_d = payload.prepImpulse(impulse_d)
 
     ### pick phi sectors to include in trigger
     #phi_sectors = [2,3,4]
@@ -62,6 +62,7 @@ if __name__=='__main__':
     #waveforms=numpy.empty((phi.shape[0],theta.shape[0]))
     #timebase=numpy.empty((phi.shape[0],theta.shape[0]))
     #multiplier=numpy.empty((phi.shape[0],theta.shape[0]))
+    impulse_list=[]
     delays_list=[]
     waveforms_list=[]
     timebase_list=[]
@@ -74,9 +75,12 @@ if __name__=='__main__':
         theta_i=0
         while theta_i<len(theta):
             delays=payload.getRemappedDelays(phi[phi_i], theta[theta_i], phi_sectors) # generate the delays per phi sector, and for each incoming wave angle phi[phi_i] and theta[theta_i]
+            #impulse should be copied over for every incoming wave, but getPayloadWaveforms overwrites it, so recopy to default...
+            impulse=copy.deepcopy(impulse_d)
             waveforms, timebase, multiplier = payload.getPayloadWaveforms(phi[phi_i], theta[theta_i], phi_sectors, impulse, (eplane, hplane), plot=False, downsample=True) # find the waveform at the payload for each
             # must add to list for now
             print('waveforms shape: ', waveforms.shape[0], ' ', waveforms.shape[1], ' ', waveforms.shape[2])
+            impulse_list.append(impulse)
             delays_list.append(delays)
             waveforms_list.append(waveforms)
             timebase_list.append(timebase)
