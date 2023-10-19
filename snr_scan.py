@@ -16,7 +16,48 @@ theta=numpy.arange(-40,10,5)
 ## angle scan not yet implemented
 #theta_range = numpy.arange(-40, 10, 4)
 #phi_range = numpy.arange(0, 51,10) 
-
+def gimmeWaveformIndex(myphi,mytheta,phi,theta):
+    #myphi=15
+    #mytheta=-10
+    phi_index=numpy.argmin(numpy.abs(phi-myphi))
+    theta_index=numpy.argmin(numpy.abs(theta-mytheta))
+    #phi_i=0 and theta_i =0 is waveforms_list[0], phi_i=0 and theta_i=1 would be waveforms_list[1], phi_i=1 and theta_i=0 would be waveforms_list[len(theta)] so (phi_index(len_theta)) + theta_index
+    #print(phi_index)
+    #print('your phi: ', phi[phi_index])
+    #print('phi index is: ', phi_index)
+    #print('your theta: ', theta[theta_index])
+    #print('theta index is: ', theta_index)
+    #print('waveforms list length is: ',len(waveforms_list))
+    waveforms_index=(phi_index*len(theta)) + theta_index
+    return waveforms_index
+    #print('waveform index: ', waveforms_index)
+    #print(phi)
+    #print(theta)
+#def gimme_phi_theta(waveforms_i):
+#    
+def gimmeHits(noise_list, snr_scan, num_of_events_per_snr_step, waveforms_list,timebase_list,delays_list,ringmask,window,step,threshold,multiplier_list,waveforms_index,save_filename):
+    waveforms=waveforms_list[waveforms_index]
+    data_to_save_i=[]
+    for j in range(len(noise_list)):
+        hits=[]
+        for snr in snr_scan:
+            _hits = 0
+            for i in range(num_of_events_per_snr_step):
+                event_noise = numpy.reshape(numpy.real(noise_list[j][2][i*waveforms.shape[0]*waveforms.shape[1]:i*waveforms.shape[0]*waveforms.shape[1]+\
+                                                                         waveforms.shape[0]*waveforms.shape[1]]), (waveforms.shape[0], waveforms.shape[1], waveforms.shape[2]))
+                
+                coh_sum, timebase_coh_sum  = trigger.coherentSum(waveforms_list[waveforms_index]*snr+event_noise, timebase_list[waveforms_index], delays_list[waveforms_index], ringmask=ringmask)
+                #print(coh_sum, timebase_coh_sum)
+                power,_ = trigger.powerSum(coh_sum/numpy.sqrt(waveforms.shape[0]*numpy.sum(ringmask)), window=window, step=step)
+                if numpy.max(power) > threshold[j]:
+                    _hits = _hits+1
+            print (snr, float(_hits)/num_of_events_per_snr_step)
+            hits.append(float(_hits)/num_of_events_per_snr_step)
+        data_to_save_i.append(numpy.array(hits))
+        data_to_save_i.append(numpy.array(hits)*(numpy.max(multiplier_list[waveforms_index])))
+    numpy.savetxt(save_filename+str(waveforms_index)+'.txt', numpy.array(data_to_save_i))
+    return hits
+    
 if __name__=='__main__':
     import sys
 
@@ -67,7 +108,7 @@ if __name__=='__main__':
     waveforms_list=[]
     timebase_list=[]
     multiplier_list=[]
-
+    waveforms_all=[]
     # we can loop over all incoming wave angles.
     phi_i=0
     theta_i=0
@@ -85,27 +126,13 @@ if __name__=='__main__':
             waveforms_list.append(waveforms)
             timebase_list.append(timebase)
             multiplier_list.append(multiplier)
+            waveforms_all.append(gimmeWaveformIndex(phi[phi_i],theta[theta_i],phi,theta))
             theta_i+=1
         phi_i+=1
-
-
     # first pick phi_i and theta_i for testing...
-    myphi=15
-    mytheta=-10
-    phi_index=numpy.argmin(numpy.abs(phi-myphi))
-    theta_index=numpy.argmin(numpy.abs(theta-mytheta))
-    #phi_i=0 and theta_i =0 is waveforms_list[0], phi_i=0 and theta_i=1 would be waveforms_list[1], phi_i=1 and theta_i=0 would be waveforms_list[len(theta)] so (phi_index(len_theta)) + theta_index
-    print(phi_index)
-    print('your phi: ', phi[phi_index])
-    print('phi index is: ', phi_index)
-    print('your theta: ', theta[theta_index])
-    print('theta index is: ', theta_index)
-    print('waveforms list length is: ',len(waveforms_list))
-    waveforms_index=(phi_index*len(theta)) + theta_index
-    print('waveform index: ', waveforms_index)
-    print(phi)
-    print(theta)
-    waveforms=waveforms_list[waveforms_index]
+    #waveforms_index2=gimmeWaveformIndex(15,-10,phi,theta)
+    #waveforms_index1=gimmeWaveformIndex(25,-10,phi,theta)
+    waveforms=waveforms_list[0]
 
     #delays = payload.getRemappedDelays(phi, theta, phi_sectors)
     # all of these also will need to get bigger to array sizes given by phi and theta sizes?
@@ -126,35 +153,17 @@ if __name__=='__main__':
     noise_list=[] # list which now has entries that are different sizes...
     #noise_list.append(thermal_noise_v1.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms.shape[0]*waveforms.shape[1]))
     noise_list.append(thermal_noise_v2.makeNoiseWaveform(ntraces=num_of_events_per_snr_step*waveforms.shape[0]*waveforms.shape[1]))
-
-    for j in range(len(noise_list)):
-        hits=[]
-        for snr in snr_scan:
-            _hits = 0
-            for i in range(num_of_events_per_snr_step):
-                event_noise = numpy.reshape(numpy.real(noise_list[j][2][i*waveforms.shape[0]*waveforms.shape[1]:i*waveforms.shape[0]*waveforms.shape[1]+\
-                                                                         waveforms.shape[0]*waveforms.shape[1]]), (waveforms.shape[0], waveforms.shape[1], waveforms.shape[2]))
-                
-                coh_sum, timebase_coh_sum  = trigger.coherentSum(waveforms_list[waveforms_index]*snr+event_noise, timebase_list[waveforms_index], delays_list[waveforms_index], ringmask=ringmask)
-                #print(coh_sum, timebase_coh_sum)
-                power,_ = trigger.powerSum(coh_sum/numpy.sqrt(waveforms.shape[0]*numpy.sum(ringmask)), window=window, step=step)
-
-                if numpy.max(power) > threshold[j]:
-                    _hits = _hits+1
-
-            print (snr, float(_hits)/num_of_events_per_snr_step)
-            hits.append(float(_hits)/num_of_events_per_snr_step)
-
-        data_to_save.append(numpy.array(hits))
-        data_to_save.append(numpy.array(hits)*(numpy.max(multiplier_list[waveforms_index])))
-                              
-        plt.plot(snr_scan, hits)
-        plt.plot(snr_scan*(numpy.max(multiplier_list[waveforms_index])), hits)
-
-    plt.ylim([-.1,1.1])
-    plt.grid(True)
-
-
-    numpy.savetxt(save_filename+'.txt', numpy.array(data_to_save))
+    hits=[]
+    for wavey in waveforms_all: 
+        hits.append(gimmeHits(noise_list, snr_scan, num_of_events_per_snr_step, waveforms_list,timebase_list,delays_list,ringmask,window,step,threshold,multiplier_list,wavey,save_filename))
+    #hits1=gimmeHits(noise_list, snr_scan, num_of_events_per_snr_step, waveforms_list,timebase_list,delays_list,ringmask,window,step,threshold,multiplier_list,waveforms_index1,save_filename)
+    #hits2=gimmeHits(noise_list, snr_scan, num_of_events_per_snr_step, waveforms_list,timebase_list,delays_list,ringmask,window,step,threshold,multiplier_list,waveforms_index2,save_filename)
     
+    plt.plot(snr_scan, hits[0],label="phi25")
+    plt.plot(snr_scan*(numpy.max(multiplier_list[0])), hits[0],label="phi25")
+    plt.plot(snr_scan, hits[1],label="phi15")
+    plt.plot(snr_scan*(numpy.max(multiplier_list[1])), hits[1],label="phi15")
+    plt.legend()
+    plt.ylim([-.1,1.1])
+    plt.grid(True)    
     plt.show()

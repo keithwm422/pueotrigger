@@ -136,6 +136,7 @@ def getPayloadWaveforms(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, 
                                 * 2 * snr, (numpy.round(delay2.flatten() / impulse.dt)).astype(numpy.int)).reshape((len(trigger_sectors), len(ring_map), len(impulse.voltage)))  
     '''
     if downsample:
+        # this overwrites impulse.time so calling multiple times changes impulse every time. For angle scan we will need to decide between copying impulse again or some other change 
         trigger_waves, impulse.time = downsamplePayload(impulse.time, trigger_waves)
                                         
     if plot:
@@ -159,7 +160,7 @@ def getPayloadWaveforms(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, 
     
     return trigger_waves, impulse.time, multiplier
 
-
+# overwrites tiem and trigger_waves so multiple calls of the downsamplePayload will overwrite the original impulse..
 def downsamplePayload(time, trigger_waves):
 
     decimate_factor = int(aso_geometry.ritc_sample_step/((time[1]-time[0])))
