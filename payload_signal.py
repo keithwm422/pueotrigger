@@ -15,10 +15,22 @@ ring_map = {
     'T'  : 3,}
 ring_map_inv = {v: k for k, v in ring_map.copy().items()}
     
-def loadImpulse(filename='impulse/triggerTF_02TH.txt'):
+def loadImpulse(filename='impulse/triggerTF_02TH.txt',plot=False):
 
     dat=numpy.loadtxt(filename)
     impulse=waveform.Waveform(dat[:,1], time=dat[:,0])
+        
+    if plot:
+        plt.scatter(dat[:,0],dat[:,1], label='loaded file')
+        plt.scatter(impulse.time,impulse.voltage, label='waveform')
+#        plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpolinterp Eplane')
+#        plt.plot(interp_angle, hplane_vpol_interp(interp_angle), label='vpolinterp Hplane')
+        plt.legend(loc='upper left')
+        plt.grid(True)
+        plt.xlabel('Time')
+        plt.ylabel('Voltage')
+
+        plt.show()
     return impulse
 
 def prepImpulse(impulse, upsample=10, filter=True, highpass_cutoff=0.28, lowpass_cutoff=1.10 ):
@@ -69,8 +81,10 @@ def beamPattern(plot=False):
     hplane_vpol_interp = interpolate.interp1d(angle, hplane_vpol, kind='cubic')
     
     if plot:
-        plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpol Eplane')
-        plt.plot(interp_angle, hplane_vpol_interp(interp_angle), label='vpol Hplane')
+        plt.scatter(angle,eplane_vpol, label='vpol Eplane')
+        plt.scatter(angle,hplane_vpol, label='vpol Hplane')
+        plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpolinterp Eplane')
+        plt.plot(interp_angle, hplane_vpol_interp(interp_angle), label='vpolinterp Hplane')
         plt.legend(loc='upper left')
         plt.grid(True)
         plt.xlabel('off-boresight angle [deg.]')

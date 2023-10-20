@@ -66,11 +66,24 @@ if __name__=='__main__':
     else:
         save_filename = 'snr_scan_data'
         
-    eplane, hplane = payload.beamPattern()
+    eplane, hplane = payload.beamPattern(plot=False)
+    #first we have the antennas Eplane and Hplane decibels versus angle which can be graphed here
+    print(type(eplane))
 
-    impulse_d = payload.loadImpulse('impulse/triggerTF_02TH.txt') # this is the freq db response of trigger. Can we load in the new PUEO antenna?
+    impulse_d = payload.loadImpulse('impulse/triggerTF_02TH.txt',plot=True) # this is the freq db response of trigger. Can we load in the new PUEO antenna?
+    impulse_X = copy.deepcopy(impulse_d)
     impulse_d = payload.prepImpulse(impulse_d)
+    #plt.scatter(impulse_X.time,impulse_X.voltage, label='loaded file')
+    plt.scatter(impulse_d.time,impulse_d.voltage, label='waveform')
+#       plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpolinterp Eplane')
+#       plt.plot(interp_angle, hplane_vpol_interp(interp_angle), label='vpolinterp Hplane')
+    plt.legend(loc='upper left')
+    plt.grid(True)
+    plt.xlabel('Time')
+    plt.ylabel('Voltage')
+    plt.show()
 
+    quit()
     ### pick phi sectors to include in trigger
     #phi_sectors = [2,3,4]
     phi_sectors = [1,2,3,4]
