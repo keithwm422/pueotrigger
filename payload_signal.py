@@ -5,6 +5,7 @@ import tools.aso_geometry as aso_geometry
 from scipy import interpolate
 from scipy.signal import lfilter, butter, cheby1
 import matplotlib.pyplot as plt
+import copy
 
 #def h_plane_vpol_beam_pattern():
     
@@ -33,12 +34,28 @@ def loadImpulse(filename='impulse/triggerTF_02TH.txt',plot=False):
         plt.show()
     return impulse
 
-def prepImpulse(impulse, upsample=10, filter=True, highpass_cutoff=0.28, lowpass_cutoff=1.10 ):
+def prepImpulse(impulse, upsample=10, filter=True, highpass_cutoff=0.28, lowpass_cutoff=1.10, plot=False):
     '''
     upsample, center, and filter impulse
     highpass_cutoff [GHz]
     '''
-    impulse.zeropad(4096)
+    # try plotting both before and after zero pad to see what is happening
+    if plot:
+        impulse2=copy.deepcopy(impulse)
+        impulse.zeropad(4096)
+        plt.scatter(impulse2.time,impulse2.voltage, label='before zeropad')
+        plt.scatter(impulse.time,impulse.voltage, label='post zeropad')
+#        plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpolinterp Eplane')
+#        plt.plot(interp_angle, hplane_vpol_interp(interp_angle), label='vpolinterp Hplane')
+        plt.legend(loc='upper left')
+        plt.grid(True)
+        plt.xlabel('Time')
+        plt.ylabel('Voltage')
+        plt.show()
+    
+    else:
+        impulse.zeropad(4096)
+
     #impulse.takeWindow([300, 1024+200])
     impulse.fft()
     impulse.upsampleFreqDomain(upsample)

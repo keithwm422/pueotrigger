@@ -26,6 +26,11 @@ class Waveform:
         self.freq = []
         self.df   = -1
 
+    def gimmeInfo(self):
+        print("n for waveform is: {}".format(self.n))
+        print("voltage type: {}".format(type(self.voltage)))
+        print("voltage shape: {}".format(self.voltage.shape))
+        print("time for waveform at end of zero pad: {}".format(type(self.time)))
     def meanSubtract(self, base_range=(0,10) ):
         self.voltage = self.voltage - numpy.mean(self.voltage[base_range[0]:base_range[1]])
         
@@ -33,21 +38,24 @@ class Waveform:
         self.voltage = self.voltage - numpy.median(self.voltage[base_range[0]:base_range[1]])
 
     def zeropad(self, pad_length=1024):
-
+        print("___before zero pad___")
+        self.gimmeInfo()
         if pad_length <= self.n:
             return None
 
         half_pad_length = int(numpy.floor((pad_length - self.n) / 2))
 
         self.voltage = numpy.hstack((numpy.zeros(half_pad_length), self.voltage, numpy.zeros(half_pad_length)))
-
+ 
         #if pad_length is odd, add extra zeros:
         while(len(self.voltage) < pad_length):
             self.voltage = numpy.hstack((numpy.zeros(1), self.voltage, numpy.zeros(1)))
 
         self.n = len(self.voltage)
         self.time = numpy.linspace(0, self.n * self.dt, self.n)
-        
+        print("___after zero pad____")
+        self.gimmeInfo()
+
     def fft(self, window_function=None):
 
         if window_function == None:

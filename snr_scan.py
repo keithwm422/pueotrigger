@@ -7,6 +7,8 @@ import payload_signal as payload
 import coherent_sum as trigger
 import noise
 import copy
+import tools.waveform as waveform
+
 #pick phi, theta (incoming wave angle)
 #phi = 15
 #theta = -10
@@ -65,14 +67,51 @@ if __name__=='__main__':
         save_filename = sys.argv[1]
     else:
         save_filename = 'snr_scan_data'
-        
+    # testing sample rate in waveform init
+    N_samples=4096
+    freq_i=100*10**6 # 100 MHz
+    omega=2*numpy.pi*freq_i
+    #now omega*t is the argument in the sine wave, so we can get real_times from this
+    period=1/freq_i
+    print(period)
+    # how many periods do you measure for, a random number maybe?
+    rng = numpy.random.default_rng()
+    num_periods=1+(rng.random()*3)
+    print(period*num_periods)
+
+    # need sampling rate now...
+    sampling_period= 3*10**(-9)# lets do 500MHz or 50Mega samples / sec
+    times=numpy.linspace(0,N_samples*sampling_period,N_samples)
+    print(times)
+    volty=numpy.sin(omega*times)
+    real_times=numpy.linspace(0,N_samples*sampling_period,int(100*N_samples))
+    print(real_times[-1])
+    real_volty=numpy.sin(omega*real_times)
+    reaL_siney=waveform.Waveform(real_volty,real_times) # what is the sampling rate now? if we had 4096 samples in 2 periods of a 100MHz sine wave then 
+
+    #real_times=numpy.linspace(0,period,N_samples)
+    #siney=waveform.Waveform(volty, sampling_rate=(sampling_period)) # what is the sampling rate now? if we had 4096 samples in 2 periods of a 100MHz sine wave then 
+    siney=waveform.Waveform(volty, times) # what is the sampling rate now? if we had 4096 samples in 2 periods of a 100MHz sine wave then 
+
+    #plt.scatter(siney.time,siney.voltage, label='waveform')
+    plt.scatter(reaL_siney.time,reaL_siney.voltage, label='real wave')
+    plt.scatter(times,volty, label='sampled wave')
+
+    #plt.scatter(siney.time,siney.voltage, label='sampled wave')
+    plt.grid(True)
+    plt.legend(loc='upper right')
+    plt.xlabel('Time')
+    plt.ylabel('Voltage')
+    plt.xlim([0,period])
+    plt.show()
+    quit()
     eplane, hplane = payload.beamPattern(plot=False)
     #first we have the antennas Eplane and Hplane decibels versus angle which can be graphed here
     print(type(eplane))
 
     impulse_d = payload.loadImpulse('impulse/triggerTF_02TH.txt',plot=True) # this is the freq db response of trigger. Can we load in the new PUEO antenna?
     impulse_X = copy.deepcopy(impulse_d)
-    impulse_d = payload.prepImpulse(impulse_d)
+    impulse_d = payload.prepImpulse(impulse_d,plot=True)
     #plt.scatter(impulse_X.time,impulse_X.voltage, label='loaded file')
     plt.scatter(impulse_d.time,impulse_d.voltage, label='waveform')
 #       plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpolinterp Eplane')
