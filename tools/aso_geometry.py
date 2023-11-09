@@ -42,6 +42,13 @@ y_ant = r_ant * np.sin(np.radians(phi_ant)) # Antenna y positions (m)
 
 #antenna tilt angle: theta, degrees
 theta_ant=-10.*np.ones(len(z_ant))
+#xpos = [0,5.6,7.5,5.6,0,0,5.6,7.5,5.6,0]
+#ypos = [7.5,5.6,0,-5.6,-7.5,7.5,5.6,0,-5.6,-7.5]
+#zpos = [-1.3,-8,-1.3,-8,-1.3,-1.3,-8,-1.3,-8,-1.3]
+# this is the whole array
+xpos = [ 7.5,    0, -7.5,    0,  5.6, 5.6, -5.6, -5.6];
+ypos = [   0,  7.5,    0, -7.5, -5.6, 5.6,  5.6, -5.6];
+zpos = [-1.3, -1.3, -1.3, -1.3,   -8,  -8,   -8,   -8];
 
 #ritc_sampling
 ritc_sample_rate = 2.6 #GHz
@@ -54,16 +61,16 @@ def drawPayload():
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(x_ant, y_ant, z_ant, marker='s', color='gray', alpha=.7, s=120)
+    ax.scatter(xpos, ypos, zpos, marker='s', color='gray', alpha=.7, s=120)
     plt.xlabel('x [m]')
     plt.ylabel('y [m]')
     #plt.zlabel('z [m]')
 
     plt.figure(figsize=(6,8))
-    plt.plot(x_ant, z_ant, 's', color='gray', ms=30, alpha=.3)
+    plt.plot(xpos, zpos, 's', color='gray', ms=30, alpha=.3)
     plt.xlabel(' x [m]')
     plt.ylabel(' z [m]')
-    plt.ylim([-8, 1])
+    #plt.ylim([-8, 1])
     plt.show()
 
 if __name__=='__main__':
