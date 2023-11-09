@@ -61,15 +61,15 @@ def drawPayload():
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(xpos, ypos, zpos, marker='s', color='gray', alpha=.7, s=120)
+    ax.scatter(xpos, ypos, zpos, marker='v', color='gray', alpha=.7, s=120)
     plt.xlabel('x [m]')
     plt.ylabel('y [m]')
     #plt.zlabel('z [m]')
 
     plt.figure(figsize=(6,8))
-    plt.plot(xpos, zpos, 's', color='gray', ms=30, alpha=.3)
+    plt.plot(xpos, ypos, 'v', color='gray', ms=30, alpha=.3)
     plt.xlabel(' x [m]')
-    plt.ylabel(' z [m]')
+    plt.ylabel(' y [m]')
     #plt.ylim([-8, 1])
     plt.show()
 
