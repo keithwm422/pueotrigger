@@ -31,7 +31,7 @@ def scanDelays(phi, theta):
 
     return np.array(t_delays)
 
-def getDelays(phi, theta, phi_sectors=range(1,17), verbose=True):
+def getDelays(phi, theta, phi_sectors=range(1,anita.num_phi_sectors), verbose=True):
     '''
     specify phi and theta values (scalars)
     and list of phi sectors of interest (default is all 16)
@@ -56,7 +56,7 @@ def getDelays(phi, theta, phi_sectors=range(1,17), verbose=True):
             print (i, '{0:.3f}'.format(useful[i]), 'ns')
     return useful
 
-def getAllDelays(phi, theta, phi_sectors=range(1,17)):
+def getAllDelays(phi, theta, phi_sectors=range(1,anita.num_phi_sectors)):
     '''
     basically same as getDelays, but phi and theta are now numpy arrays,
     and a dictionary of delays is created for each (phi, theta) combination
@@ -141,22 +141,23 @@ def makeDelayElevationPlot(phi=0.0, phi_sector=1, plot=True):
 if __name__=='__main__':
 
     #example usage:
-
+    print(f'anita: {anita.loc!s}')
+    print(f'anita: {anita.phisector!s}')
     ## getDelays function:
     phi = 0.0 #11.25
     theta = -50
-    phi_sectors_of_interest = [1,2,3] #range(1,17)
+    phi_sectors_of_interest = [1,2,3] #range(1,anita.num_phi_sectors) this will be a top, bottom, and top again..
     getDelays(phi, theta, phi_sectors_of_interest, verbose=True)
 
     
     ## getAllDelays function:
     phi = np.array([0.0,0.0])
     theta = np.array([-30,0.0])
-    phi_sectors_of_interest = [1,2,3,14,15] #range(1,17)
+    phi_sectors_of_interest = [1,2,3,4,5] #range(1,8)
     data_dict=getAllDelays(phi, theta, phi_sectors_of_interest)
 
     ## read DelayDict (read in output of getAllDelays)
-    plotDelayDictEvent(data_dict, 0)
+    plotDelayDictEvent(data_dict, 1)
     
     ##make del-el plot
     makeDelayElevationPlot()
