@@ -1,11 +1,13 @@
 import numpy as np
 
 num_phi_sectors = 8
-num_skirt_rings = 0
-num_top_rings = 0
-num_antennas = num_phi_sectors * (num_top_rings + num_skirt_rings)
+num_skirt_rings = 0 # nothing like this yet in Corals sim
+num_top_rings = 0 # probably should be 1 top ring and 1 bottom ring, but the entire idea of "phi" sectors in ANITA is that antennas from multiple rings will have same phi for triggering purposes. 
+#num_antennas = num_phi_sectors * (num_top_rings + num_skirt_rings)
+num_antennas=8 # for corals, set to 8 antennas
 
 #antenna names / array organization
+# Choice of convention, start with a "top" ring antenna as phi sector 
 phisector=[]
 loc=[]
 for j in ['T', 'B']:

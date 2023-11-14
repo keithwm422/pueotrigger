@@ -5,8 +5,8 @@
 import myplot  #specific for running on UC midway cluster
 import matplotlib.pyplot as plt
 import numpy as np
-from . constants import *
-from . import CoRaLs_geometry as anita
+from constants import *
+import CoRaLs_geometry as anita
 
 def delay(phi, theta):
     '''
@@ -118,7 +118,7 @@ def makeDelayElevationPlot(phi=0.0, phi_sector=1, plot=True):
     t_delays = scanDelays(phis, thetas)
     phi_sector = int(phi_sector)
 
-    if phi_sector < 1 or phi_sector > antennas_per_ring:
+    if phi_sector < 1 or phi_sector > anita.num_phi_sectors:
         print ('no such phi-sector')
         return
 
@@ -145,7 +145,7 @@ if __name__=='__main__':
     ## getDelays function:
     phi = 0.0 #11.25
     theta = -50
-    phi_sectors_of_interest = [1,2,15] #range(1,17)
+    phi_sectors_of_interest = [1,2,3] #range(1,17)
     getDelays(phi, theta, phi_sectors_of_interest, verbose=True)
 
     
