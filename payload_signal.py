@@ -1,7 +1,7 @@
 import numpy
 import tools.waveform as waveform
 import tools.delays as delays
-import tools.aso_geometry as aso_geometry
+import tools.CoRaLs_geometry as aso_geometry
 from scipy import interpolate
 from scipy.signal import lfilter, butter, cheby1
 import matplotlib.pyplot as plt
@@ -9,10 +9,8 @@ import matplotlib.pyplot as plt
 #def h_plane_vpol_beam_pattern():
     
 ring_map = {
-    'BB' : 0,
-    'B'  : 1,
-    'M'  : 2,
-    'T'  : 3,}
+    'B'  : 0,
+    'T'  : 1,}
 ring_map_inv = {v: k for k, v in ring_map.copy().items()}
     
 def loadImpulse(filename='impulse/triggerTF_02TH.txt'):
@@ -110,14 +108,19 @@ def getPayloadWaveforms(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, 
     '''
     delay = delays.getAllDelays([phi], [el], phi_sectors=trigger_sectors) #gets delays at all antennas
     #delay2 = getRemappedDelays([phi], [el], trigger_sectors) #gets delays at all antennas
-
+    print(type(delay))
+    print(delay)
     trigger_waves=numpy.zeros((len(trigger_sectors), 4, len(impulse.voltage)))
 
     multiplier=[]
     
     #not yet optimized for speed
     for i in delay[0]['delays']:
-        
+        print(i[1])
+        print(ring_map[i[1]])
+        print(i[0]-numpy.min(trigger_sectors),ring_map[i[1]])
+        print(trigger_waves.shape)
+        print(noise.shape)
         trigger_waves[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] = \
             numpy.roll(impulse.voltage * 2 * snr, int(numpy.round(delay[0]['delays'][i] / impulse.dt))) * \
             dBtoVoltsAtten(beam_pattern[1](phi-aso_geometry.phi_ant[i[0]-1])) * \

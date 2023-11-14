@@ -30,7 +30,7 @@ if __name__=='__main__':
 
     ### pick phi sectors to include in trigger
     #phi_sectors = [2,3,4]
-    phi_sectors = [1,2,3,4]
+    phi_sectors = [1,2,3,4] # for CoRaLS this is 8 phi sectors, alternating between a bottom and a top in each phi sector. Only one antenna per phi sector 
     #phi_sectors = [2]
 
     ### pick rings to include in trigger

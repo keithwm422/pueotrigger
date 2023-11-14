@@ -8,7 +8,7 @@ num_antennas = num_phi_sectors * (num_top_rings + num_skirt_rings)
 #antenna names / array organization
 phisector=[]
 loc=[]
-for j in ['T', 'M', 'B', 'BB']:
+for j in ['T', 'B']:
     for i in range(num_phi_sectors):
         phisector.append(i+1)
         loc.append(j)

@@ -5,10 +5,8 @@
 import myplot  #specific for running on UC midway cluster
 import matplotlib.pyplot as plt
 import numpy as np
-from .constants import *
-from . import aso_geometry as anita
-
-antennas_per_ring = 24
+from . constants import *
+from . import CoRaLs_geometry as anita
 
 def delay(phi, theta):
     '''
@@ -17,7 +15,6 @@ def delay(phi, theta):
     x_planewave = np.cos(np.radians(theta)) * np.cos(np.radians(phi))
     y_planewave = np.cos(np.radians(theta)) * np.sin(np.radians(phi))
     z_planewave = np.sin(np.radians(theta))
-
     delays =  -1.0 * ( (anita.x_ant * x_planewave) \
                        + (anita.y_ant * y_planewave) \
                        + (anita.z_ant * z_planewave) ) / c_light
@@ -65,6 +62,8 @@ def getAllDelays(phi, theta, phi_sectors=range(1,17)):
     and a dictionary of delays is created for each (phi, theta) combination
     '''
     t_delays = scanDelays(phi, theta)
+    print(type(t_delays))
+    print(t_delays.shape)
     data_dict={}
     delays_only=[]
     for k in range(len(t_delays)):
@@ -96,8 +95,8 @@ def plotDelayDictEvent(delay_dict, event):
         for i in phi_sectors:
             if i[1]=='B':
                 plt.plot(delay_dict[event]['delays'][i[0],i[1]],int(i[0]), 'o', ms=4, color='blue')
-            elif i[1]=='M':
-                plt.plot(delay_dict[event]['delays'][i[0],i[1]],int(i[0]), 'o', ms=4, color='green')
+            #elif i[1]=='M':
+            #    plt.plot(delay_dict[event]['delays'][i[0],i[1]],int(i[0]), 'o', ms=4, color='green')
             elif i[1]=='T':
                 plt.plot(delay_dict[event]['delays'][i[0],i[1]],int(i[0]), 'o', ms=4, color='red')
         plt.grid()
@@ -125,9 +124,9 @@ def makeDelayElevationPlot(phi=0.0, phi_sector=1, plot=True):
 
     if plot:
         fig=plt.figure()
-        plt.plot(thetas, t_delays[:,phi_sector+antennas_per_ring-1] - t_delays[:,phi_sector+antennas_per_ring*2-1], label='mid-bot')
-        plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector+antennas_per_ring*2-1], label='top-bot')
-        plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector+antennas_per_ring-1], label='top-mid')
+        #plt.plot(thetas, t_delays[:,phi_sector+antennas_per_ring-1] - t_delays[:,phi_sector+antennas_per_ring*2-1], label='mid-bot')
+        #plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector+antennas_per_ring*2-1], label='top-bot')
+        plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector], label='top-bottom')
         plt.legend()
         plt.xlabel('Elevation Angle [deg]')
         plt.ylabel('Delay [ns]')
