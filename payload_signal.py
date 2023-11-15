@@ -178,7 +178,7 @@ if __name__=="__main__":
     
     import noise
 
-    eplane, hplane = beamPattern()
+    eplane, hplane = beamPattern(plot=True)
 
     impulse = loadImpulse('impulse/triggerTF_02TH.txt')
 

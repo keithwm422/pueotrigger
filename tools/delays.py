@@ -5,8 +5,8 @@
 import myplot  #specific for running on UC midway cluster
 import matplotlib.pyplot as plt
 import numpy as np
-from constants import *
-import CoRaLs_geometry as anita
+from . constants import *
+from . import CoRaLs_geometry as anita
 
 def delay(phi, theta):
     '''
