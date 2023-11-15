@@ -18,7 +18,7 @@ def delay(phi, theta):
     delays =  -1.0 * ( (anita.x_ant * x_planewave) \
                        + (anita.y_ant * y_planewave) \
                        + (anita.z_ant * z_planewave) ) / c_light
-
+    #print(delays)
     return delays - np.min(delays)
 
 def scanDelays(phi, theta):
@@ -100,8 +100,12 @@ def plotDelayDictEvent(delay_dict, event):
             elif i[1]=='T':
                 plt.plot(delay_dict[event]['delays'][i[0],i[1]],int(i[0]), 'o', ms=4, color='red')
         plt.grid()
+        str_to_plot="Theta: " +str(delay_dict[event]['theta'])+" , Phi: "+str(delay_dict[event]['phi'])
+        #print(str_to_plot)
+        #plt.text(delay_dict[event]['theta'])
         plt.xlabel('pulse arrival time [ns]')
         plt.ylabel('anita phi sector no.')
+        plt.title(str_to_plot)
         plt.tight_layout()
         
     else:
@@ -114,8 +118,12 @@ def makeDelayElevationPlot(phi=0.0, phi_sector=1, plot=True):
     '''
     thetas = np.arange(-65, 41, 2)
     phis = np.ones(len(thetas)) * phi
+    phis2 = np.ones(len(thetas)) * (phi+30.0)
+    phis3 = np.ones(len(thetas)) * (phi+330.0)
 
     t_delays = scanDelays(phis, thetas)
+    t_delays2 = scanDelays(phis2, thetas)
+    t_delays3 = scanDelays(phis3, thetas)
     phi_sector = int(phi_sector)
 
     if phi_sector < 1 or phi_sector > anita.num_phi_sectors:
@@ -126,10 +134,14 @@ def makeDelayElevationPlot(phi=0.0, phi_sector=1, plot=True):
         fig=plt.figure()
         #plt.plot(thetas, t_delays[:,phi_sector+antennas_per_ring-1] - t_delays[:,phi_sector+antennas_per_ring*2-1], label='mid-bot')
         #plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector+antennas_per_ring*2-1], label='top-bot')
-        plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector], label='top-bottom')
+        #plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector], label='top-bottom')
+        plt.plot(thetas, t_delays[:,phi_sector-1] - t_delays[:,phi_sector], label='phi='+str(phi))
+        plt.plot(thetas, t_delays2[:,phi_sector-1] - t_delays2[:,phi_sector], label='phi='+str(phi+30.0))
+        plt.plot(thetas, t_delays3[:,phi_sector-1] - t_delays3[:,phi_sector], label='phi='+str(phi-30.0))
         plt.legend()
         plt.xlabel('Elevation Angle [deg]')
         plt.ylabel('Delay [ns]')
+        plt.title('Delay times: Top-Bottom')
         plt.grid()
         plt.tight_layout()
         #plt.show()
@@ -144,8 +156,9 @@ if __name__=='__main__':
     print(f'anita: {anita.loc!s}')
     print(f'anita: {anita.phisector!s}')
     ## getDelays function:
-    phi = 0.0 #11.25
+    phi = 90.0 #11.25
     theta = -50
+    #print(delay(phi,theta))
     phi_sectors_of_interest = [1,2,3] #range(1,anita.num_phi_sectors) this will be a top, bottom, and top again..
     getDelays(phi, theta, phi_sectors_of_interest, verbose=True)
 
@@ -153,11 +166,11 @@ if __name__=='__main__':
     ## getAllDelays function:
     phi = np.array([0.0,0.0])
     theta = np.array([-30,0.0])
-    phi_sectors_of_interest = [1,2,3,4,5] #range(1,8)
+    phi_sectors_of_interest = [1,2,3,4,5,6,7,8] #range(1,8)
     data_dict=getAllDelays(phi, theta, phi_sectors_of_interest)
 
     ## read DelayDict (read in output of getAllDelays)
-    plotDelayDictEvent(data_dict, 1)
+    plotDelayDictEvent(data_dict, 0)
     
     ##make del-el plot
     makeDelayElevationPlot()

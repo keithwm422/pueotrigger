@@ -71,9 +71,9 @@ def drawPayload(incoming_wave=False, phi=0, theta=0):
             r=r_ant[0]
             x_planewave = r* np.cos(np.radians(theta)) * np.cos(np.radians(phi))
             y_planewave = r* np.cos(np.radians(theta)) * np.sin(np.radians(phi))
-            z_planewave = -1* r +r* np.sin(np.radians(theta))
+            z_planewave = (-0.5* r) +r* np.sin(np.radians(theta))
             if(theta==0):
-                z_planewave=-r
+                z_planewave=-0.5*r
             ax.quiver( x_planewave, y_planewave, z_planewave, # <-- starting point of vector
                 90-phi, phi, theta, #  directions of vector in degrees
                 color = 'red', alpha = .8, lw = 3)
@@ -82,16 +82,16 @@ def drawPayload(incoming_wave=False, phi=0, theta=0):
     #plt.zlabel('z [m]')
 
     plt.figure(figsize=(6,8))
-    plt.plot(xpos, ypos, 'v', color='gray', ms=30, alpha=.3)
+    plt.plot(xpos, zpos, 'v', color='gray', ms=30, alpha=.3)
     l=0
     while l < len(loc):
-        plt.text(xpos[l], ypos[l], loc[l], fontsize=12)
-        plt.text(xpos[l]+0.5, ypos[l]+0.5, str(l+1), fontsize=12)
+        plt.text(xpos[l], zpos[l], loc[l], fontsize=12)
+        plt.text(xpos[l]+0.5, zpos[l]+0.5, str(l+1), fontsize=12)
         l+=1
     plt.xlabel(' x [m]')
-    plt.ylabel(' y [m]')
+    plt.ylabel(' z [m]')
     #plt.ylim([-8, 1])
     plt.show()
 
 if __name__=='__main__':
-    drawPayload(incoming_wave=True, phi=45, theta=-20)
+    drawPayload(incoming_wave=True, phi=30, theta=0)
