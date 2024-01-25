@@ -20,7 +20,7 @@ for i in range(num_phi_sectors):
 
 
 #azimuthal direction of antennas, degrees
-phi_ant  = np.tile(np.arange(0., 360., 360./num_phi_sectors), 4)
+#phi_ant  = np.tile(np.arange(0., 360., 360./num_phi_sectors), 4)
 
 # this is the whole array
 # but the existing code needs these positions to be in the order of the declared phi-sectors locations above. Otherwise, user-interfaces with phisectors calls are completely wrong.
@@ -28,10 +28,11 @@ phi_ant  = np.tile(np.arange(0., 360., 360./num_phi_sectors), 4)
 #xpos = [ 7.5,    0, -7.5,    0,  5.6, 5.6, -5.6, -5.6]
 #ypos = [   0,  7.5,    0, -7.5, -5.6, 5.6,  5.6, -5.6]
 #zpos = [-1.3, -1.3, -1.3, -1.3,   -8,  -8,   -8,   -8]
-xpos = [ 7.5,  5.6,    0, -5.6, -7.5, -5.6,    0,  5.6]
-ypos = [   0,  5.6,  7.5,  5.6,    0, -5.6, -7.5, -5.6]
-zpos = [-1.3,   -8, -1.3,   -8, -1.3,   -8, -1.3,   -8] 
-
+xpos      = [ 7.5,  5.6,    0, -5.6, -7.5, -5.6,    0,  5.6]
+ypos      = [   0,  5.6,  7.5,  5.6,    0, -5.6, -7.5, -5.6]
+zpos      = [-1.3,   -8, -1.3,   -8, -1.3,   -8, -1.3,   -8] 
+phi_tilt   = [   0,   45,   90,  135,  180, -135,  -90,  -45]
+theta_tilt = [ -30,  -60,  -30,  -60,  -30,  -60,  -30,  -60]
 z_ant = np.array(zpos)
 x_ant = np.array(xpos) # Antenna x positions (m)
 y_ant = np.array(ypos) # Antenna y positions (m)
@@ -42,7 +43,15 @@ while i<len(x_ant):
     i+=1
 r_ant=np.array(r_list)
 #antenna tilt angle: theta, degrees
-theta_ant=-10.*np.ones(len(z_ant))
+#theta_ant=-10.*np.ones(len(z_ant))
+# tilt angles from peter's matlab scripts
+phi_ant=np.array(phi_tilt)
+theta_ant=np.array(theta_tilt)
+
+#normal_az = [0  90 180 -90 -45 45 135 -135];
+#normal_el = [-30 -30 -30 -30 -60 -60 -60 -60];
+
+
 #xpos = [   0, 5.6,  7.5,  5.6,    0,    0, 5.6,  7.5,  5.6,    0]
 #ypos = [ 7.5, 5.6,    0, -5.6, -7.5,  7.5, 5.6,    0, -5.6, -7.5]
 #zpos = [-1.3,  -8, -1.3,   -8, -1.3, -1.3,  -8, -1.3,   -8, -1.3]

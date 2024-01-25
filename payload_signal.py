@@ -53,31 +53,90 @@ def prepImpulse(impulse, upsample=10, filter=True, highpass_cutoff=0.28, lowpass
     
     return impulse
 
-def beamPattern(plot=False):
+#beamPattern interpolation from datafiles or function. For corals right now this is function not data.
+# we should break this into 2 sections for E_plane and H_plane of antennas and then we can do beam pattern for them based on the plane and both phi and el for each plane...
+# we use h_plane and e_plane as the same resp, just h_plane is rotated by 90 for resp with respect to el I guess...
+
+# This function returns a E_plane beamPattern tuple that has both a el and phi resp (2D spline)
+# don't really need a spline since its all a function currently, but eventually need a spline for real resp data included...
+# This function returns a H_plane beamPattern tuple that has both a el and phi resp
+
+def beamPattern(plot=False,which_plane='E', which_pol='V'):
     '''
-    anita vpol beam battern
+    CoRaLS proxy beam pattern
     '''
+    num_az=361
+    az=numpy.linspace(-180,180,num_az)
+    #print(len(az))
+    #print(az)
+    num_el=181
+    el=numpy.linspace(-90,90,num_el)
+    #el = -90:90;
+    #fc = [150*10**6,300*10**6,450*10**6,600*10**6]; # units in MHz
+    #fc2 = 150e6:50e6:850e6;
+    #fc2=np.arange(150*10**6,850*10**6,50*10**6) # step size of 50MHz
+    #c = physconst('Lightspeed');
+    #c_speed=299792458 #m/s
+    resp = 1*numpy.ones((num_el,num_az))
+    el_i = 0 
+    az_i = 0
+    while el_i<len(el):
+        az_i = 0
+        while az_i<len(az):
+            resp[el_i,az_i] = 10*numpy.log10(resp[el_i,az_i]*(numpy.cos(numpy.radians(el[el_i]))**(6))*numpy.cos(numpy.radians((az[az_i])/(2.0)))**(10))
+            az_i+=1
+        el_i+=1
+    '''
+    angle=
     angle = [-50,-40,-30,-20,-10,0,10,20,30,40,50]
     eplane_vpol = [-7.5, -5, -3, -1.5, -.5, 0, -.5, -1.5, -3, -5, -7.5]
     hplane_vpol = [-16, -11, -6, -3, -1, 0, -1, -3, -6, -11, -16]
-    
-    interp_angle = numpy.arange(-50,51,1)
-    
+    interp_angle = numpy.arange(-50,51,1)    
     eplane_vpol_interp = interpolate.interp1d(angle, eplane_vpol, kind='cubic')
     hplane_vpol_interp = interpolate.interp1d(angle, hplane_vpol, kind='cubic')
-    
+    '''
+    if which_plane=='E':
+        if which_pol=='V':
+            # eplane and vpol response at a phi?
+            plane_interp=interpolate.interp1d(el, resp[:,int(num_az/2)], kind='cubic')
+        elif which_pol=='H':
+            # eplane and hpol response at a el?
+            # now this is obviously wrong but I am not sure what to put for the hpol response of the eplane of the antenna...
+            # so for now stick with vpol responses...
+            plane_interp=interpolate.interp1d(az, resp[int(num_el/2),:], kind='cubic')
+    elif which_plane=='E1':
+        plane_interp=interpolate.interp1d(el, resp[:,int(num_az/2)], kind='cubic')
+    elif which_plane=='H':
+        if which_pol=='V':
+            # hplane and vpol response at a el seems to be what was happening for the antenna responses
+            plane_interp=interpolate.interp1d(az, resp[int(num_el/2),:], kind='cubic')
+        elif which_pol=='H':
+            # hplane and hpol response at a az?
+            # now this is obviously wrong but I am not sure what to put for the hpol response of the eplane of the antenna...
+            # so for now stick with vpol responses...
+            plane_interp=interpolate.interp1d(el, resp[:,int(num_az/2)], kind='cubic')
+    elif which_plane=='H1':
+        plane_interp = interpolate.interp1d(el, resp[:,int(num_az/2)], kind='cubic')
+    #we can pick a phi I suppose for this plot. but I am not sure if this is phi or theta. It may have been symmetric?
     if plot:
-        plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpol Eplane')
-        plt.plot(interp_angle, hplane_vpol_interp(interp_angle), label='vpol Hplane')
+        #plt.plot(interp_angle, eplane_vpol_interp(interp_angle), label='vpol Eplane')
+        #plt.plot(interp_angle, hplane_vpol_interp(interp_angle), label='vpol Hplane')
+        az_i=0
+        while az_i < num_az:
+            #plt.plot(el, resp[:,int(num_az/2)])
+            plt.plot(el, resp[:,az_i])
+            if az_i==int(num_az/2):
+                plt.plot(el, resp[:,az_i],'--')
+            az_i+=1
         plt.legend(loc='upper left')
         plt.grid(True)
         plt.xlabel('off-boresight angle [deg.]')
         plt.ylabel('amplitude [dB]')
+        plt.xlim([-50,50])
+        plt.ylim([-10,1])
 
         plt.show()
-
-    return eplane_vpol_interp, hplane_vpol_interp
-
+    return plane_interp
 def dBtoVoltsAtten(db_value):
     '''
     does what it says
@@ -120,7 +179,18 @@ def getPayloadWaveforms(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, 
         print(ring_map[i[1]])
         print(i[0]-numpy.min(trigger_sectors),ring_map[i[1]])
         print(trigger_waves.shape)
-        print(noise.shape)
+        print("noise shape " + str(noise.shape))
+        # calculate the phi and el and correct it to be within the interpolation range [(-90,90) or (-180,180)]
+        phi_interp=phi-aso_geometry.phi_ant[i[0]-1]
+        if phi_interp < -90:
+            delta_phi=phi_interp+90
+            phi_interp=-90-(phi_interp+90)
+        elif phi_interp>90:
+            phi_interp=-180
+        # this line below: trigger_waves elements are calculated based on beam_pattern which is a tuple of eplane,hplane interp functions. beam_pattern[1] is hplane and [0] is eplane
+        # hplane is evaluated with phi positions of antennas, and eplane is evaluated at el of antennas. The arguments to these are actually the "off-boresight" angle
+        # so the argument is an angle that is the difference of incoming wave and the antenna's angle tilt in phi and theta 
+        
         trigger_waves[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] = \
             numpy.roll(impulse.voltage * 2 * snr, int(numpy.round(delay[0]['delays'][i] / impulse.dt))) * \
             dBtoVoltsAtten(beam_pattern[1](phi-aso_geometry.phi_ant[i[0]-1])) * \
@@ -178,7 +248,9 @@ if __name__=="__main__":
     
     import noise
 
-    eplane, hplane = beamPattern(plot=True)
+    # for corals, the beamPatterns get more complex, so we need to break apart to multiple calls
+    eplane = beamPattern(plot=True,which_plane='E',which_pol='V')
+    hplane = beamPattern(plot=True,which_plane='H',which_pol='V')
 
     impulse = loadImpulse('impulse/triggerTF_02TH.txt')
 
@@ -214,6 +286,7 @@ if __name__=="__main__":
     '''
     
     #plot a boresight SNR of 5
+    #waveform is incoming at phi and el, so maybe better if beam pattern is 2D now?
     getPayloadWaveforms(22.5, -25, [1,2,3,4], impulse, (eplane, hplane), snr=5, noise=numpy.real(noise[2]), plot=True)
     #getPayloadWaveforms(22.5, -25, [1,2,3,4], impulse, (eplane, hplane), snr=5,  plot=True)
 
