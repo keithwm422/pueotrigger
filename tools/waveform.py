@@ -20,34 +20,44 @@ class Waveform:
             self.time = numpy.linspace(0, self.n, self.n)
             
         self.dt = self.time[1]-self.time[0]
+        self.time_zeroed = self.time-min(self.time) #-- start timebase at t=0
 
         #freq domain placeholders, can be assigned later:
         self.ampl = []
         self.freq = []
         self.df   = -1
 
+    def gimmeInfo(self):
+        print("n for waveform is: {}".format(self.n))
+        print("voltage type: {}".format(type(self.voltage)))
+        print("voltage shape: {}".format(self.voltage.shape))
+        print("time for waveform at end of zero pad: {}".format(type(self.time)))
+    
     def meanSubtract(self, base_range=(0,10) ):
         self.voltage = self.voltage - numpy.mean(self.voltage[base_range[0]:base_range[1]])
         
     def medianSubtract(self, base_range=(0,10) ):
         self.voltage = self.voltage - numpy.median(self.voltage[base_range[0]:base_range[1]])
 
-    def zeropad(self, pad_length=1024):
-
+    def zeropad(self, pad_length=1024): # pad_length is default to 1024, but we use 2^12, 4096 size. so we have to expand any waveforms to this size, with zeros before and after.
+        print("___before zero pad___")
+        self.gimmeInfo()
         if pad_length <= self.n:
             return None
 
         half_pad_length = int(numpy.floor((pad_length - self.n) / 2))
 
         self.voltage = numpy.hstack((numpy.zeros(half_pad_length), self.voltage, numpy.zeros(half_pad_length)))
-
+ 
         #if pad_length is odd, add extra zeros:
         while(len(self.voltage) < pad_length):
             self.voltage = numpy.hstack((numpy.zeros(1), self.voltage, numpy.zeros(1)))
 
         self.n = len(self.voltage)
         self.time = numpy.linspace(0, self.n * self.dt, self.n)
-        
+        print("___after zero pad____")
+        self.gimmeInfo()
+
     def fft(self, window_function=None):
 
         if window_function == None:
