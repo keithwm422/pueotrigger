@@ -32,7 +32,8 @@ class Waveform:
         print("voltage type: {}".format(type(self.voltage)))
         print("voltage shape: {}".format(self.voltage.shape))
         print("time for waveform at end of zero pad: {}".format(type(self.time)))
-    
+        print("waveform dt is: {}".format(self.dt))
+
     def meanSubtract(self, base_range=(0,10) ):
         self.voltage = self.voltage - numpy.mean(self.voltage[base_range[0]:base_range[1]])
         
@@ -55,6 +56,7 @@ class Waveform:
 
         self.n = len(self.voltage)
         self.time = numpy.linspace(0, self.n * self.dt, self.n)
+        self.time_zeroed = self.time-min(self.time) #-- start timebase at t=0
         print("___after zero pad____")
         self.gimmeInfo()
 
@@ -80,6 +82,7 @@ class Waveform:
         self.voltage = factor/2.0 * numpy.fft.irfft(self.ampl) 
         self.n = len(self.voltage)
         self.time  = numpy.arange(0., self.n/( 2.*new_nyquist_ghz), 1/( 2.*new_nyquist_ghz))
+        self.time_zeroed = self.time-min(self.time) #-- start timebase at t=0
         self.dt = self.time[1]-self.time[0]
 
     def upsampleTimeDomain(self, factor, kind='linear'):
@@ -90,6 +93,7 @@ class Waveform:
         self.voltage = spint.interp1d(self.time, self.voltage,
                               kind=kind, axis=0)(new_time)
         self.time = new_time
+        self.time_zeroed = self.time-min(self.time) #-- start timebase at t=0
         self.dt = self.time[1]-self.time[0]  
         self.n = len(self.voltage)
             
@@ -97,12 +101,14 @@ class Waveform:
         
         self.voltage = self.voltage[::factor]
         self.time = self.time[::factor]
+        self.time_zeroed = self.time-min(self.time) #-- start timebase at t=0
         self.dt = self.time[1]-self.time[0]  
         self.n = len(self.voltage)
 
     def takeWindow(self, window):
         self.voltage = self.voltage[window[0]:window[1]]
         self.time = self.time[window[0]:window[1]]
+        self.time_zeroed = self.time-min(self.time) #-- start timebase at t=0
         self.n = len(self.voltage)
 
     def autoCorrelate(self):
