@@ -27,13 +27,17 @@ class Waveform:
         self.freq = []
         self.df   = -1
 
-    def gimmeInfo(self):
+    def gimmeInfo(self, marker=0):
         print("n for waveform is: {}".format(self.n))
         print("voltage type: {}".format(type(self.voltage)))
         print("voltage shape: {}".format(self.voltage.shape))
         print("time for waveform at end of zero pad: {}".format(type(self.time)))
         print("waveform dt is: {}".format(self.dt))
+        print("marker: {}".format(marker))
 
+    def keithadd(self, base_range=(0,10) ):
+        self.voltage[-200:] = self.voltage[-200:] + 10
+        
     def meanSubtract(self, base_range=(0,10) ):
         self.voltage = self.voltage - numpy.mean(self.voltage[base_range[0]:base_range[1]])
         
