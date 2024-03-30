@@ -194,7 +194,7 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
     for i in delay[0]['delays']:
         print("i[0] is: {}".format(i[0]))
         print("i[1] is: {}".format(i[1]))
-        print("ring map: {}".format(ring_map[i[1]]))
+        print("ring map[i[1]]: {}".format(ring_map[i[1]]))
         # calculate the phi and el and correct it to be within the interpolation range [(-90,90) or (-180,180)]
         phi_interp=phi-aso_geometry.phi_ant[i[0]-1]
         if phi_interp < -90:
@@ -238,21 +238,32 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
         #trigger_waves2, impulse2.time = downsamplePayload(impulse2.time, trigger_waves2)
                        
     if plot:
-        fig, ax = plt.subplots(len(ring_map), len(trigger_sectors))
-        for i in range(len(trigger_sectors)):
-            for j in range(len(ring_map)):
-                if j != 0:
-                    ax[len(ring_map)-j-1,i].set_xticklabels([])
-                if i != 0:
-                    ax[len(ring_map)-j-1,i].set_yticklabels([])
-
-                ax[len(ring_map)-j-1,i].plot(impulse.time, trigger_waves[i,j], label=str(i)+ring_map_inv[j], c='black', lw=1, alpha=0.7)
-                ax[len(ring_map)-j-1,i].plot(impulse2.time, trigger_waves2[i,j], label=str(i)+ring_map_inv[j], c='red', lw=1, alpha=0.7)
-
-                #ax[len(ring_map)-j-1,i].plot(impulse.time, trigger_waves2[i,j],  c='black', lw=1, alpha=0.7)
-
-                ax[len(ring_map)-j-1,i].legend(loc='upper right')
-                #ax[len(ring_map)-j-1,i].set_ylim([-snr-1,snr+1])
+        # we have to divide by 2 since half of the antennas in the trigger are at the top and half are at the bottom, and do something special for odds
+        if len(trigger_sectors) % 2==0:
+             num_trig_colz=int(len(trigger_sectors)/2)
+        else:
+             num_trig_colz=int(len(trigger_sectors)/2)+1
+        fig, ax = plt.subplots(len(ring_map), num_trig_colz) 
+        for trig_sec_phi in range(len(trigger_sectors)):
+            #subplots are backwards from our labelling of 0 being Bottom ring and 1 being Top ring antennas, ugh
+            j=1 # bottom ring of antennas and also bottom row in subplots
+            trig_ring=0
+            k=int((trigger_sectors[trig_sec_phi]-1)/2) # the column of the subplots
+            print("triggers_sectors[trig_sec_phi]: {}".format(trigger_sectors[trig_sec_phi]))
+            print("k is : {}".format(k))
+            if trigger_sectors[trig_sec_phi] % 2 != 0: #trigger_sectors[trig_sec_phi] of even numbers are bottoms and odds are tops, but j=0 row of suplots is the top row
+                 #if this really is a phi sector, then following my own convetion, phi_sector=1,3,5,7 are "Top"s and 2,4,6,8 are "Bottom"s and therefore for all triggered phi sectors should be displayed as such
+                 j=0
+                 trig_ring=1
+            if j == 0:
+                ax[j,k].set_xticklabels([])
+            if k != 0:
+                ax[j,k].set_yticklabels([])
+            ax[j,k].plot(impulse.time, trigger_waves[trig_sec_phi,trig_ring], label=str(trigger_sectors[trig_sec_phi])+ring_map_inv[trig_ring], c='black', lw=1, alpha=0.7)
+            ax[j,k].plot(impulse2.time, 0.1*trigger_waves2[trig_sec_phi,trig_ring], label=str(trigger_sectors[trig_sec_phi])+ring_map_inv[trig_ring], c='red', lw=1, alpha=0.7)
+            #ax[len(ring_map)-j-1,i].plot(impulse.time, trigger_waves2[i,j],  c='black', lw=1, alpha=0.7)
+            ax[j,k].legend(loc='upper right')
+            #ax[len(ring_map)-j-1,i].set_ylim([-snr-1,snr+1])
 
         plt.suptitle('phi = '+str(phi)+'deg.  theta = '+str(el)+'deg.', fontsize=20)
         #plt.tight_layout()
@@ -387,7 +398,6 @@ def loadPlaneWave(freq_i=100*10**6):
 if __name__=="__main__":
     
     import noise
-
     # for corals, the beamPatterns get more complex, so we need to break apart to multiple calls
     eplane = beamPattern(plot=True,which_plane='E',which_pol='V')
     hplane = beamPattern(plot=True,which_plane='H',which_pol='V')
