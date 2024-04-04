@@ -487,10 +487,13 @@ if __name__=="__main__":
 
     # or load impulse event
     impulse = loadImpulse('impulse/triggerTF_02TH.txt')
+    print("length of file is: {} ".format(impulse.n))
     gimmePlotsImpulse(impulse)
 
     #impulse2 = loadImpulse('impulse/triggerTF_02TH.txt')
     impulse = prepImpulse(impulse)
+    gimmePlotsImpulse(impulse)
+
     #impulse.gimmeInfo()
     #gimmePlots(impulse,impulse2)
     #gimmePlotsImpulse(impulse,impulse2)
