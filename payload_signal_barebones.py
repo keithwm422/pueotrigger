@@ -176,18 +176,20 @@ def getPayloadDelays(phi,el,trigger_sectors):
     print(delay)
     return delay_all
 
-def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, noise=None, plot=False, downsample=False):
+def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, noise=None, plot=False, downsample=False, debugging=False):
     delay = delays.getAllDelays([phi], [el], phi_sectors=trigger_sectors) #gets delays at all antennas     
-    print(type(delay))
-    print(delay)
+    if debugging: 
+        print(type(delay))
+        print(delay)
     #construct trigger_waves to keep the wfs that passed the trigger
-    trigger_waves=numpy.zeros((len(trigger_sectors), 4, len(impulse.voltage)))
-    trigger_waves2=numpy.zeros((len(trigger_sectors), 4, len(impulse.voltage)))
+    trigger_waves=numpy.zeros((len(trigger_sectors), 2, len(impulse.voltage))) # the two here is for number of rings, which is 2 for corals
+    trigger_waves2=numpy.zeros((len(trigger_sectors), 2, len(impulse.voltage)))
     impulse2=deepcopy(impulse)
     #impulse2.keithadd()
 
 
-    print("trigger waves.shape is: {}".format(trigger_waves.shape))
+    if debugging: 
+        print("trigger waves.shape is: {}".format(trigger_waves.shape))
 
     # the trigger waves isn't going to have the right shape now, because the code below expects each number index to be either a top or bottom, whereas corals doesn't have that kind of geometry
 
@@ -196,9 +198,10 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
     
     #not yet optimized for speed
     for i in delay[0]['delays']:
-        print("i[0] is: {}".format(i[0]))
-        print("i[1] is: {}".format(i[1]))
-        print("ring map[i[1]]: {}".format(ring_map[i[1]]))
+        if debugging:
+            print("i[0] is: {}".format(i[0]))
+            print("i[1] is: {}".format(i[1]))
+            print("ring map[i[1]]: {}".format(ring_map[i[1]]))
         # calculate the phi and el and correct it to be within the interpolation range [(-90,90) or (-180,180)]
         phi_interp=phi-aso_geometry.phi_ant[i[0]-1]
         if phi_interp<-180:
@@ -212,12 +215,13 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
         elif theta_interp <-90:
              theta_interp=-180-theta_interp
         #if theta_interp <-90:
-        print("phi: {}".format(phi))
-        print("phi_ant: {}".format(aso_geometry.phi_ant[i[0]-1]))
-        print("phi_interp: {}".format(phi_interp))
-        print("el: {}".format(el))
-        print("el_ant: {}".format(aso_geometry.theta_ant[i[0]-1]))
-        print("theta_interp: {}".format(theta_interp))
+        if debugging: 
+            print("phi: {}".format(phi))
+            print("phi_ant: {}".format(aso_geometry.phi_ant[i[0]-1]))
+            print("phi_interp: {}".format(phi_interp))
+            print("el: {}".format(el))
+            print("el_ant: {}".format(aso_geometry.theta_ant[i[0]-1]))
+            print("theta_interp: {}".format(theta_interp))
         # this line below: trigger_waves elements are calculated based on beam pattern which is a tuple of eplane,hplane interp functions but for now we just use the function provided by Peter Gorham.
         # 
         # previously, beam_pattern[1] is hplane and [0] is eplane
@@ -234,7 +238,7 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
             #old below
             #dBtoVoltsAtten(beam_pattern[1](phi-aso_geometry.phi_ant[i[0]-1])) * \
             #dBtoVoltsAtten(beam_pattern[0](el -aso_geometry.theta_ant[0]))
-        
+        multiplier.append(beamPatternEfield(phi_interp,theta_interp))
         trigger_waves2[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] = \
             numpy.roll(impulse2.voltage * 2 * snr, int(numpy.round(delay[0]['delays'][i] / impulse2.dt)))
         #there is a multiplier here that is hplane[dphi(phi)] and eplane[del(el)].
@@ -243,9 +247,10 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
         
         #add in the noise if its included.
         if noise is not None:
-            print("noise shape " + str(noise.shape))
-            print("length of i in payload signal is: {}".format(len(i)))
-            print("length of ring map in payload signal is: {}".format(len(ring_map)))
+            if debugging:
+                print("noise shape " + str(noise.shape))
+                print("length of i in payload signal is: {}".format(len(i)))
+                print("length of ring map in payload signal is: {}".format(len(ring_map)))
             trigger_waves[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] += \
                                 noise[(i[0]-numpy.min(trigger_sectors))*len(ring_map) + ring_map[i[1]]]
 
@@ -270,8 +275,9 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
             j=1 # bottom ring of antennas and also bottom row in subplots
             trig_ring=0
             k=int((trigger_sectors[trig_sec_phi]-1)/2) # the column of the subplots
-            print("triggers_sectors[trig_sec_phi]: {}".format(trigger_sectors[trig_sec_phi]))
-            print("k is : {}".format(k))
+            if debugging:
+                print("triggers_sectors[trig_sec_phi]: {}".format(trigger_sectors[trig_sec_phi]))
+                print("k is : {}".format(k))
             if trigger_sectors[trig_sec_phi] % 2 != 0: #trigger_sectors[trig_sec_phi] of even numbers are bottoms and odds are tops, but j=0 row of suplots is the top row
                  #if this really is a phi sector, then following my own convetion, phi_sector=1,3,5,7 are "Top"s and 2,4,6,8 are "Bottom"s and therefore for all triggered phi sectors should be displayed as such
                  j=0
@@ -414,7 +420,7 @@ def loadPlaneWave(freq_i=100*10**6):
     #plt.xlim([0,period*10**9])
     plt.title("waveform for sine wave")
     plt.show()
-    return siney
+    return siney     
 
 if __name__=="__main__":
     
@@ -457,7 +463,7 @@ if __name__=="__main__":
     #getPayloadWaveforms(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=numpy.real(noise[2]), plot=True)
     #try without noise and just plane wave as impulse
     #getSinglePayloadWaveform(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=numpy.real(noise[2]), plot=True)
-    getSinglePayloadWaveform(202.5, +25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=None, plot=True)
+    getSinglePayloadWaveform(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=None, plot=True, debugging=True)
     #getPayloadWaveforms(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=numpy.real(noise[2]), plot=True)
 
     #I think I need to include just the plane wave (i.e. no noise added and maybe not even impulse/ impulse response) to see how the delay and all that works for a "trigger_wave" in the getPayload function

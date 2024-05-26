@@ -3,12 +3,12 @@ import myplot
 import matplotlib.pyplot as plt
 import tools.aso_geometry as aso_geometry
 import tools.constants as constants
-import payload_signal as payload
+import payload_signal_barebones as payload
 import math
 
-def coherentSum(waveforms, timebase, delays, downsample=False, ringmask=[1,1,1,1]):
+def coherentSum(waveforms, timebase, delays, downsample=False, ringmask=[1,1]):
     '''
-    mask = ring mask [bb, b, m, t]
+    mask = ring mask [B, T]
     '''
     
     #decimates to specified sample rate
@@ -42,6 +42,10 @@ def coherentSum(waveforms, timebase, delays, downsample=False, ringmask=[1,1,1,1
         timebase = timebase[::decimate_factor]
 
     return coh_sum, timebase
+def GimmeInfo(waveforms):
+    print("len of payload single waveforms[0,0] is: {}".format(int(len(waveforms[0,0]))))
+    print("waveforms.shape[0] is: {}".format(waveforms.shape[0]))
+    print("waveforms.shape[1] is: {}".format(waveforms.shape[1]))
 
 def powerSum(coh_sum, window=32, step=16):
     '''
@@ -66,17 +70,26 @@ if __name__=='__main__':
     phi = 22.5
     theta = -10
 
-    eplane, hplane = payload.beamPattern(plot=False)
-    
-    impulse = payload.loadImpulse('impulse/triggerTF_02TH.txt')
-    impulse = payload.prepImpulse(impulse)
+    #eplane, hplane = payload.beamPattern(plot=False)
+    eplane = payload.beamPattern(plot=True,which_plane='E',which_pol='V')
+    hplane = payload.beamPattern(plot=True,which_plane='H',which_pol='V')
+    #impulse = payload.loadImpulse('impulse/triggerTF_02TH.txt')
+    #impulse = payload.prepImpulse(impulse)
+    #impulse = loadImpulse('impulse/triggerTF_02TH.txt')
+    impulse = payload.loadImpulse('impulse/coralsLPDA_impResponse.txt')
+    payload.gimmePlotsImpulse(impulse)
+    #impulse2 = loadImpulse('impulse/triggerTF_02TH.txt')
+    #impulse = prepImpulse(impulse)
+    impulse = payload.prepImpulse(impulse, highpass_cutoff=0.15, lowpass_cutoff=2)
 
     print ('timestep of input pulse [ns]:', impulse.dt)
     
-    delays = payload.getRemappedDelays(phi, theta, [1,2,3,4])
-    waveforms, timebase,_ = payload.getPayloadWaveforms(phi, theta, [1,2,3,4], impulse, (eplane, hplane))
-
-    coh_sum, timebase_coh_sum  = coherentSum(waveforms, timebase, delays, True)
+    delays = payload.getRemappedDelays(phi, theta, [1,2,3,4,5])
+    waveforms, timebase,_ = payload.getSinglePayloadWaveform(phi, theta, [1,2,3,4,5], impulse, (eplane, hplane))
+    #getSinglePayloadWaveform(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=None, plot=True)
+    GimmeInfo(waveforms)
+    coh_sum, timebase_coh_sum  = coherentSum(waveforms, timebase, delays, False)
+    #coh_sum, timebase_coh_sum  = coherentSum(waveforms, timebase, delays, True)
     #coh_sum2, timebase_coh_sum2  = coherentSum(waveforms, timebase, delays, False)
 
     #print len(coh_sum2), len(timebase_coh_sum2)
@@ -107,7 +120,7 @@ if __name__=='__main__':
     elscan_start = -30
     
     for phiscan in range(phiscan_start, 45, 1):
-        waveforms, timebase,_ = payload.getPayloadWaveforms(phiscan, theta, [1,2,3,4], impulse, (eplane, hplane))
+        waveforms, timebase,_ = payload.getSinglePayloadWaveform(phiscan, theta, [1,2,3,4], impulse, (eplane, hplane))
         coh_sum, timebase_coh_sum  = coherentSum(waveforms, timebase, delays, False, ringmask = [1,1,1,1])
         coh_sum2, timebase_coh_sum2  = coherentSum(waveforms, timebase, delays, False, ringmask = [1,1,1,0])
         power, frames = powerSum(coh_sum)
@@ -119,7 +132,7 @@ if __name__=='__main__':
     el_scan_power_ritc = []
 
     for elscan in range(elscan_start,10,1):
-        waveforms, timebase,_ = payload.getPayloadWaveforms(phi, elscan, [1,2,3,4], impulse, (eplane, hplane))
+        waveforms, timebase,_ = payload.getSinglePayloadWaveform(phi, elscan, [1,2,3,4], impulse, (eplane, hplane))
         coh_sum, timebase_coh_sum = coherentSum(waveforms, timebase, delays, False, ringmask = [1,1,1,1])
         coh_sum2, timebase_coh_sum2  = coherentSum(waveforms, timebase, delays, False, ringmask = [1,1,1,0])
         power, frames = powerSum(coh_sum)

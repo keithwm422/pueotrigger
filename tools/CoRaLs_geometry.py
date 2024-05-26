@@ -31,8 +31,12 @@ for i in range(num_phi_sectors):
 xpos      = [ 7.5,  5.6,    0, -5.6, -7.5, -5.6,    0,  5.6]
 ypos      = [   0,  5.6,  7.5,  5.6,    0, -5.6, -7.5, -5.6]
 zpos      = [-1.3,   -8, -1.3,   -8, -1.3,   -8, -1.3,   -8] 
+#real
 phi_tilt   = [   0,   45,   90,  135,  180, -135,  -90,  -45]
 theta_tilt = [ -30,  -60,  -30,  -60,  -30,  -60,  -30,  -60]
+#make them all the same
+#phi_tilt   = [   45,   45,   45,  45,  45, 45,  45,  45]
+#theta_tilt = [ -30,  -30,  -30,  -30,  -30,  -30,  -30,  -30]
 z_ant = np.array(zpos)
 x_ant = np.array(xpos) # Antenna x positions (m)
 y_ant = np.array(ypos) # Antenna y positions (m)

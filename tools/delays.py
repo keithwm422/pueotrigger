@@ -62,8 +62,8 @@ def getAllDelays(phi, theta, phi_sectors=range(1,anita.num_phi_sectors)):
     and a dictionary of delays is created for each (phi, theta) combination
     '''
     t_delays = scanDelays(phi, theta)
-    print(type(t_delays))
-    print(t_delays.shape)
+    #print(type(t_delays))
+    #print(t_delays.shape)
     data_dict={}
     delays_only=[]
     for k in range(len(t_delays)):
