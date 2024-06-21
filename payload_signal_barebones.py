@@ -176,7 +176,7 @@ def getPayloadDelays(phi,el,trigger_sectors):
     print(delay)
     return delay_all
 
-def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, snr=1, noise=None, plot=False, downsample=False, debugging=False):
+def getSinglePayloadWaveform(phi, el, psi, trigger_sectors, impulse, beam_pattern, snr=1, noise=None, plot=False, downsample=False, applyPolarization=False, debugging=False):
     delay = delays.getAllDelays([phi], [el], phi_sectors=trigger_sectors) #gets delays at all antennas     
     if debugging: 
         print(type(delay))
@@ -234,13 +234,26 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
         trigger_waves[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] = \
             numpy.roll(impulse.voltage * 2 * snr, int(numpy.round(delay[0]['delays'][i] / impulse.dt)))* \
             dBtoVoltsAtten(beamPatternEfield(phi_interp,theta_interp))
+        trigger_waves2[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] = \
+            numpy.roll(impulse2.voltage * 2 * snr, int(numpy.round(delay[0]['delays'][i] / impulse2.dt)))* \
+            dBtoVoltsAtten(beamPatternEfield(phi_interp,theta_interp))
+
             #new above
             #old below
             #dBtoVoltsAtten(beam_pattern[1](phi-aso_geometry.phi_ant[i[0]-1])) * \
             #dBtoVoltsAtten(beam_pattern[0](el -aso_geometry.theta_ant[0]))
-        multiplier.append(beamPatternEfield(phi_interp,theta_interp))
-        trigger_waves2[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] = \
-            numpy.roll(impulse2.voltage * 2 * snr, int(numpy.round(delay[0]['delays'][i] / impulse2.dt)))
+        if applyPolarization:
+            trigger_waves[i[0]-numpy.min(trigger_sectors),ring_map[i[1]]] *= \
+                0.5
+                #get incoming wave polarization angle psi
+                #for the antenna reference frame, incoming wave vector is alpha, beta. And polariation vector has rotation Psi around that vector.
+                #the incoming wave polarization angle psi is between 0 and 90 degrees.
+                # the transformation of the incoming wave into the antennas reference frame... 
+                # the antenna's normal plane for its alpha 
+            multiplier.append(beamPatternEfield(phi_interp,theta_interp)*0.5)
+        else:
+            multiplier.append(beamPatternEfield(phi_interp,theta_interp))
+        
         #there is a multiplier here that is hplane[dphi(phi)] and eplane[del(el)].
         #multiplier.append(dBtoVoltsAtten(beam_pattern[1](phi-aso_geometry.phi_ant[i[0]-1])) * \
         #    dBtoVoltsAtten(beam_pattern[0](el -aso_geometry.theta_ant[0])))
@@ -286,8 +299,8 @@ def getSinglePayloadWaveform(phi, el, trigger_sectors, impulse, beam_pattern, sn
                 ax[j,k].set_xticklabels([])
             #if k != 0:
                 #ax[j,k].set_yticklabels([])
+            ax[j,k].plot(impulse2.time, trigger_waves2[trig_sec_phi,trig_ring], label=str(trigger_sectors[trig_sec_phi])+ring_map_inv[trig_ring], c='red', lw=1, alpha=0.7)
             ax[j,k].plot(impulse.time, trigger_waves[trig_sec_phi,trig_ring], label=str(trigger_sectors[trig_sec_phi])+ring_map_inv[trig_ring], c='black', lw=1, alpha=0.7)
-            #ax[j,k].plot(impulse2.time, trigger_waves2[trig_sec_phi,trig_ring], label=str(trigger_sectors[trig_sec_phi])+ring_map_inv[trig_ring], c='red', lw=1, alpha=0.7)
             #ax[len(ring_map)-j-1,i].plot(impulse.time, trigger_waves2[i,j],  c='black', lw=1, alpha=0.7)
             ax[j,k].legend(loc='upper right')
             #ax[len(ring_map)-j-1,i].set_ylim([-snr-1,snr+1])
@@ -463,7 +476,8 @@ if __name__=="__main__":
     #getPayloadWaveforms(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=numpy.real(noise[2]), plot=True)
     #try without noise and just plane wave as impulse
     #getSinglePayloadWaveform(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=numpy.real(noise[2]), plot=True)
-    getSinglePayloadWaveform(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=None, plot=True, debugging=True)
+    #getSinglePayloadWaveform(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=None, plot=True, debugging=True)
+    getSinglePayloadWaveform(22.5, -25, 0, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=None, plot=True, applyPolarization=True, debugging=True)
     #getPayloadWaveforms(22.5, -25, trigger_sectors_phi, impulse, (eplane, hplane), snr=5, noise=numpy.real(noise[2]), plot=True)
 
     #I think I need to include just the plane wave (i.e. no noise added and maybe not even impulse/ impulse response) to see how the delay and all that works for a "trigger_wave" in the getPayload function
