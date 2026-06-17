@@ -1,0 +1,825 @@
+% =============================================================================
+% CoRaLS Dual-Pol Trigger Signal Chain: Reference Document
+% =============================================================================
+% Purpose: Detailed technical reference for the simulated signal chain from
+%          raw impulse through to S-curve generation. Written for debugging
+%          and edification, not publication.
+% =============================================================================
+
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{fancyvrb}          % Verbatim environments with line numbers
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{mdframed}
+
+% ---- colour scheme for code boxes ----
+\definecolor{codebg}{rgb}{0.96,0.96,0.96}
+\definecolor{commentcolor}{rgb}{0.4,0.4,0.4}
+\definecolor{keywordcolor}{rgb}{0.13,0.29,0.53}
+\definecolor{warningbg}{rgb}{1.0,0.95,0.85}
+\definecolor{notebg}{rgb}{0.88,0.95,0.88}
+
+\newenvironment{codebox}{%
+  \begin{mdframed}[backgroundcolor=codebg,linewidth=0.5pt,innerleftmargin=6pt,innerrightmargin=6pt,innertopmargin=4pt,innerbottommargin=4pt]%
+  \small}{\end{mdframed}}
+
+\newenvironment{warningbox}{%
+  \begin{mdframed}[backgroundcolor=warningbg,linewidth=1pt,frametitle={\small\textbf{Pitfall / Past Bug}},innerleftmargin=6pt]}%
+  {\end{mdframed}}}
+
+\newenvironment{notebox}{%
+  \begin{mdframed}[backgroundcolor=notebg,linewidth=0.5pt,frametitle={\small\textbf{Note}},innerleftmargin=6pt]}%
+  {\end{mdframed}}}
+
+\RecustomVerbatimEnvironment{Verbatim}{Verbatim}{fontsize=\small,frame=none,numbers=left,numbersep=4pt}
+
+\title{\textbf{CoRaLS Dual-Pol Trigger Simulation}\\\large Signal Chain Reference: From Impulse to S-Curve}
+\author{Reference Document --- Not for Publication}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Overview and Motivation}
+% =============================================================================
+
+This document traces the complete simulated signal chain used to generate
+efficiency (S-) curves for the CoRaLS dual-polarization radio trigger. The
+primary goals are:
+
+\begin{enumerate}[nosep]
+  \item Establish a single authoritative reference for how SNR is defined at
+        every stage so that comparisons between filter configurations are
+        self-consistent.
+  \item Document every normalization and threshold convention so that a future
+        reader (or a future debugging session) can reproduce results without
+        re-reading all source files.
+  \item Record bugs that were found and fixed so they are not re-introduced.
+\end{enumerate}
+
+The chain consists of the following scripts, roughly in dependency order:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Script & Purpose & Key output \\
+\midrule
+\texttt{generate\_dualpol\_noise\_chunked.py} & Generate raw noise files & \texttt{noise/dualpol\_noise\_\{hpol,vpol\}.npy} \\
+\texttt{generate\_power\_dualpol.py}           & Beamform noise $\to$ power frames  & \texttt{noise/power\_\{lhcp,rhcp\}\_160\_40*.npy} \\
+\texttt{generate\_threshold\_curves\_dualpol.py} & Fit false-rate curve, solve threshold & \texttt{noise/threshold\_analysis\_dualpol*.json} \\
+\texttt{snr\_scan\_dualpol.py}                 & Monte Carlo S-curves & \texttt{plots/snr\_scan\_dualpol\_*.npy} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Support modules used throughout:
+\texttt{payload\_signal.py} (impulse/waveform preparation, beam patterns),
+\texttt{coherent\_sum.py} (beamforming, filtering, circular decomposition, power sum),
+\texttt{tools/filters.py} (Shannon-Whitaker FIR),
+\texttt{noise.py} (thermal noise generator).
+
+% =============================================================================
+\section{Noise Generation}
+% =============================================================================
+
+\subsection{What is generated}
+
+Noise is generated as band-limited white thermal noise at the RITC ADC sample
+rate of $f_s = 4$\,GHz (sample step $\Delta t = 0.25$\,ns) with
+$V_\mathrm{rms} = 1.0$.  Eight independent channels are produced: four H-pol
+and four V-pol (one per physical antenna location).  The total duration is
+$0.5$\,s, giving $2 \times 10^9$ samples per channel.  The arrays are written
+directly to \texttt{noise/dualpol\_noise\_hpol.npy} and
+\texttt{noise/dualpol\_noise\_vpol.npy} as memory-mapped float64 arrays of
+shape \texttt{(4, 2\_000\_000\_000)}.
+
+\begin{codebox}
+\begin{Verbatim}
+# generate_dualpol_noise_chunked.py  (excerpt)
+thermal_noise = noise.ThermalNoise(
+    v_rms=vrms,
+    fbins=fbins_chunk,
+    time_domain_sampling_rate=sample_step_ns   # 0.25 ns
+)
+# Generated independently for each of 8 channels (4 H + 4 V)
+# Saved as memory-mapped float64: shape (4, total_samples)
+\end{Verbatim}
+\end{codebox}
+
+\begin{notebox}
+The raw noise has $V_\mathrm{rms} \approx 1.0$ by construction. After the
+first digital lowpass filter (1.5\,GHz Shannon-Whitaker) the RMS drops to
+$\sigma_{f1} \approx 0.852$ (measured: 0.8519 H, 0.8524 V). After the
+optional second filter at 750\,MHz the RMS drops further to
+$\sigma_{f2} \approx 0.592$. These ratios are consistent with
+$\sigma_{f1}/\sigma_\mathrm{raw} \approx \sqrt{1.5/2.0} = 0.866$ and
+$\sigma_{f2}/\sigma_{f1} \approx \sqrt{0.75/1.5} = 0.707$.
+\end{notebox}
+
+% =============================================================================
+\section{Impulse Preparation}
+% =============================================================================
+
+The template signal is measured impulse data from
+\texttt{impulse/corals\_impulse\_sci.txt}.  The key preparation step is the
+normalization in \texttt{prepImpulse}:
+
+\begin{codebox}
+\begin{Verbatim}
+# payload_signal.py -- prepImpulse()
+impulse.zeropad(4096)
+impulse.fft()
+impulse.time = impulse.time - impulse.time[0]
+
+# Normalize: Vpp = 1 exactly
+impulse.voltage = impulse.voltage / (
+    numpy.max(impulse.voltage) - numpy.min(impulse.voltage)
+)
+\end{Verbatim}
+\end{codebox}
+
+\textbf{Critical consequence:} After \texttt{prepImpulse}, the impulse has
+peak-to-peak amplitude $V_{pp} = 1.0$ regardless of any other parameter.
+This is the reference against which SNR is defined (see Section~\ref{sec:snr}).
+
+The impulse is not filtered during preparation. The analog (pre-ADC) filter
+response is entirely below the Nyquist frequency of the ADC and is
+incorporated implicitly in the measured waveform itself.
+
+After applying the Shannon-Whitaker digital filter, the peak-to-peak amplitude
+of an individual antenna waveform is essentially unchanged:
+$V_{pp}^{f1} \approx V_{pp}^{f2} \approx 1.00$. This is because the impulse's
+energy is already well below the filter cutoffs; the filters remove only
+out-of-band noise.
+
+% =============================================================================
+\section{Per-Antenna Waveform Generation}
+% =============================================================================
+
+\texttt{getPayloadWaveforms\_dualpol} generates 8 waveforms (4 H-pol,
+4 V-pol) from the single normalized impulse, incorporating:
+
+\begin{itemize}[nosep]
+  \item \textbf{Polarization projection.} Signal arrives at polarization angle
+        $\psi$ (default 45° for equal power split).
+        $\cos\psi$ scales H-pol, $\sin\psi$ scales V-pol.
+  \item \textbf{Beam pattern attenuation.}  Each antenna's recorded voltage is
+        multiplied by the beam response at the arrival direction
+        $(\phi, \theta)$, evaluated separately for E- and H-planes.
+  \item \textbf{Geometric delay.} Each antenna's waveform is rolled by
+        $\tau_\mathrm{ant}(\phi,\theta)$ samples.
+\end{itemize}
+
+\begin{codebox}
+\begin{Verbatim}
+# payload_signal.py -- getPayloadWaveforms_dualpol() (simplified)
+psi_rad = numpy.deg2rad(psi)
+pol_h   = numpy.cos(psi_rad)   # H projection coefficient
+pol_v   = numpy.sin(psi_rad)   # V projection coefficient
+
+for ant_idx, ant_num in enumerate(antennas):
+    delay_samples = int(numpy.round(ant_delay / impulse.dt))
+
+    waveforms[ant_num] = numpy.roll(impulse.voltage * snr, delay_samples) \
+        * pol_h \
+        * dBtoVoltsAtten(beam_patterns_h[0](phi_interp)) \
+        * dBtoVoltsAtten(beam_patterns_h[1](theta_interp))
+
+    waveforms[ant_num + 4] = numpy.roll(impulse.voltage * snr, delay_samples) \
+        * pol_v \
+        * dBtoVoltsAtten(beam_patterns_v[0](theta_interp)) \
+        * dBtoVoltsAtten(beam_patterns_v[1](phi_interp))
+\end{Verbatim}
+\end{codebox}
+
+The \texttt{snr} argument to \texttt{getPayloadWaveforms\_dualpol} is set to
+$1.0$ by \texttt{snr\_scan\_dualpol.py}. Amplitude scaling is applied
+externally before signal injection (see Section~\ref{sec:injection}).
+
+At boresight ($\phi = \theta = 0$, $\psi = 45°$), with unit beam response and
+zero delay, each antenna delivers $V_{pp} = \cos(45°) = 1/\sqrt{2}$ in H and
+$V_{pp} = \sin(45°) = 1/\sqrt{2}$ in V. The quadrature sum gives the full
+$V_{pp} = 1$ in power terms.
+
+% =============================================================================
+\section{SNR Definition}
+\label{sec:snr}
+% =============================================================================
+
+\subsection{The definition used in \texttt{snr\_scan\_dualpol.py}}
+
+\begin{mdframed}[backgroundcolor=notebg,linewidth=1pt]
+\textbf{Definition:}
+\[
+  \mathrm{SNR} \;\triangleq\; \frac{V_{pp}^{\mathrm{impulse}}}{2\,\sigma_{f1}}
+\]
+where $V_{pp}^{\mathrm{impulse}} = 1$ (after \texttt{prepImpulse}) and
+$\sigma_{f1}$ is the per-antenna, per-channel noise RMS measured \emph{after}
+applying the first 1.5\,GHz Shannon-Whitaker digital filter to the raw noise
+files.
+
+This is the \textbf{analog filter reference SNR}: it matches the noise floor
+seen by the hardware at the ADC input, after the analog anti-aliasing filter
+has acted.
+\end{mdframed}
+
+Numerically, $\sigma_{f1} \approx 0.852$ (measured from the noise files), so
+at $\mathrm{SNR} = 1$ the signal amplitude scale applied to each antenna is:
+\[
+  s = \mathrm{SNR} \times 2\,\sigma_{f1} = 1 \times 2 \times 0.852 = 1.704.
+\]
+
+\subsection{Why not the raw ($f_s/2 = 2$\,GHz) noise RMS?}
+
+The raw noise RMS $\sigma_\mathrm{raw} \approx 1.0$ (by construction of the
+noise generator). It represents the total noise power in the band
+$[0, 2\,\mathrm{GHz}]$.  Using $\sigma_\mathrm{raw}$ as the reference would
+give $s = 1.0$ at SNR $= 0.5$, introducing a filter-dependent offset on the
+x-axis that makes it impossible to compare filt1 vs.\ filt2 directly. Since
+the hardware anti-alias filter is always present, $\sigma_{f1}$ is the
+operationally meaningful noise floor.
+
+\subsection{Code}
+
+\begin{codebox}
+\begin{Verbatim}
+# snr_scan_dualpol.py -- noise RMS calculation
+rms_sample_size  = 100_000
+noise_rms_h = np.sqrt(np.mean(
+    noise_h_full[:, :rms_sample_size].astype(np.float64)**2))
+noise_rms_v = np.sqrt(np.mean(
+    noise_v_full[:, :rms_sample_size].astype(np.float64)**2))
+# noise_rms_raw ~ 1.0 by construction
+
+filt_sample_size = 200_000
+noise_h_f1 = filters.apply_Shannon_Whitaker_filter(
+    noise_h_full[:, :filt_sample_size].astype(np.float64))
+noise_v_f1 = filters.apply_Shannon_Whitaker_filter(
+    noise_v_full[:, :filt_sample_size].astype(np.float64))
+noise_rms_f1_h = np.sqrt(np.mean(noise_h_f1**2))
+noise_rms_f1_v = np.sqrt(np.mean(noise_v_f1**2))
+noise_rms_f1   = (noise_rms_f1_h + noise_rms_f1_v) / 2
+# ~ 0.852
+
+noise_rms = noise_rms_f1  # THIS is the SNR axis denominator
+\end{Verbatim}
+\end{codebox}
+
+\subsection{Signal injection}
+\label{sec:injection}
+
+\begin{codebox}
+\begin{Verbatim}
+# snr_scan_dualpol.py -- per-trial signal injection
+sig_scale     = snr * 2 * noise_rms    # noise_rms = sigma_f1
+injected_h    = waveforms_h * sig_scale + event_noise_h
+injected_v    = waveforms_v * sig_scale + event_noise_v
+\end{Verbatim}
+\end{codebox}
+
+At injection SNR $= 1$, each antenna receives:
+\[
+  v_\mathrm{ant}(t) = 1.704 \cdot w_\mathrm{impulse}(t) + n(t),
+  \qquad n \sim \mathcal{N}(0,\,\sigma_\mathrm{raw}^2)
+\]
+The noise $n(t)$ is the raw (unfiltered) noise segment extracted from the
+pre-generated files. It will be filtered during beamforming.
+
+\subsection{Effective SNR after beamforming and filtering}
+
+After 4-antenna coherent beamforming the signal voltage grows by $N_\mathrm{ant}
+= 4$, while the incoherent noise power grows by $N_\mathrm{ant}$:
+\[
+  \mathrm{SNR}_\mathrm{beamformed} = \sqrt{N_\mathrm{ant}} \cdot \mathrm{SNR}_\mathrm{per-antenna}
+  = 2 \cdot \mathrm{SNR}.
+\]
+This improvement applies equally to both filter configurations (since the
+beamforming step is the same). The filter only affects the noise floor
+\emph{relative to the unfiltered reference}, which is why the SNR axis is
+already quoted in $\sigma_{f1}$ units.
+
+% =============================================================================
+\section{The Hardware Signal Chain in Software}
+\label{sec:chain}
+% =============================================================================
+
+\texttt{coherentSum\_dualpol} implements the following ordered steps:
+
+\begin{enumerate}
+  \item \textbf{Digitize / decimate} to 4\,GHz ($\Delta t = 0.25$\,ns) by
+        integer decimation.
+  \item \textbf{Shannon-Whitaker FIR lowpass at 1.5\,GHz} (first filter).
+  \item \textbf{Optional Shannon-Whitaker FIR lowpass at 750\,MHz} (second
+        filter, enabled by \texttt{apply\_second\_filter=True}).
+  \item \textbf{Coherent sum} each polarization:
+        apply geometric delays (integer-sample roll) and sum all antennas.
+  \item \textbf{Circular polarization conversion:}
+        $\mathrm{LHCP} = (H + jV)/\sqrt{2}$;
+        $\mathrm{RHCP} = (H - jV)/\sqrt{2}$, done in the Fourier domain.
+\end{enumerate}
+
+\begin{codebox}
+\begin{Verbatim}
+# coherent_sum.py -- coherentSum_dualpol() (key steps)
+
+# Step 1: Decimate to 4 GHz
+dt_in          = timebase[1] - timebase[0]
+decimate_factor = int(aso_geometry.ritc_sample_step / dt_in)
+waveforms_h_dig = waveforms_h[:, ::decimate_factor]
+waveforms_v_dig = waveforms_v[:, ::decimate_factor]
+
+# Step 2: First filter (1.5 GHz Shannon-Whitaker)
+waveforms_h_filt1 = filters.apply_Shannon_Whitaker_filter(waveforms_h_dig)
+waveforms_v_filt1 = filters.apply_Shannon_Whitaker_filter(waveforms_v_dig)
+
+# Step 2b: Optional second filter (750 MHz)
+if apply_second_filter:
+    waveforms_h_filt2 = filters.apply_Shannon_Whitaker_filter(
+        waveforms_h_filt1, fc=fc_second)
+    waveforms_v_filt2 = filters.apply_Shannon_Whitaker_filter(
+        waveforms_v_filt1, fc=fc_second)
+else:
+    waveforms_h_filt2 = waveforms_h_filt1
+    waveforms_v_filt2 = waveforms_v_filt1
+
+# Step 3: Coherent sum
+coh_h, tb = coherentSum(waveforms_h_filt2, timebase, delays, downsample=False)
+coh_v, _  = coherentSum(waveforms_v_filt2, timebase, delays, downsample=False)
+
+# coherentSum() applies integer-sample roll per antenna:
+#   _delay = -int(round(delays[ant] / dt))
+#   coh_sum += roll(waveforms[ant], _delay)
+
+# Step 4-6: Circular basis conversion via FFT
+H_fft    = numpy.fft.rfft(coh_h)
+V_fft    = numpy.fft.rfft(coh_v)
+V_shifted = 1j * V_fft          # pi/2 phase shift
+LHCP_fft  = (H_fft + V_shifted) / numpy.sqrt(2)
+RHCP_fft  = (H_fft - V_shifted) / numpy.sqrt(2)
+lhcp = numpy.fft.irfft(LHCP_fft, n=len(coh_h))
+rhcp = numpy.fft.irfft(RHCP_fft, n=len(coh_h))
+\end{Verbatim}
+\end{codebox}
+
+\noindent\textbf{Order matters.} The filter is applied \emph{per antenna
+before beamforming}. This matches the hardware implementation where each
+channel is filtered digitally before the combinatorial sum. Apply the filter
+after the sum and you will get a different (incorrect) threshold.
+
+% =============================================================================
+\section{Sliding-Window Power Sum}
+% =============================================================================
+
+\begin{codebox}
+\begin{Verbatim}
+# coherent_sum.py -- powerSum()
+def powerSum(coh_sum, window=32, step=16):
+    num_frames      = int((len(coh_sum) - window) // step) + 1
+    coh_power       = numpy.abs(coh_sum)**2
+    coh_sum_windowed = numpy.lib.stride_tricks.as_strided(
+        coh_power,
+        shape   = (num_frames, window),
+        strides = (coh_power.strides[0] * step, coh_power.strides[0])
+    )
+    power = numpy.sum(coh_sum_windowed, axis=1) / window
+    return power.astype(numpy.float64), num_frames
+\end{Verbatim}
+\end{codebox}
+
+For the trigger, the default parameters are:
+\[
+  W = 160\;\mathrm{samples} = 40\;\mathrm{ns},
+  \qquad
+  S = 40\;\mathrm{samples} = 10\;\mathrm{ns}.
+\]
+The returned quantity is the mean squared voltage per window:
+\[
+  P[k] = \frac{1}{W} \sum_{i=kS}^{kS+W-1} \bigl|v[i]\bigr|^2.
+\]
+This is \emph{not} normalized by $N_\mathrm{ant}$.  The beamformed voltage
+at boresight is $\sum_n v_n$, so for pure signal power grows as
+$N_\mathrm{ant}^2$ and for pure noise as $N_\mathrm{ant}$ under coherent and
+incoherent sums, respectively.
+
+\begin{warningbox}
+\textbf{Do not divide by $N_\mathrm{ant}$ before comparing against the
+threshold.}  The threshold values in the JSON files (e.g.\ $T_{f1} = 5.006$
+at 0.1\,Hz) are calibrated on the un-normalized beamformed noise power using
+\texttt{generate\_power\_dualpol.py}, which never divides by
+$N_\mathrm{ant}$. Dividing the scan power by $N_\mathrm{ant}$ before the
+comparison shrinks the effective threshold by a factor of $N_\mathrm{ant}$,
+making it $4\times$ too strict (old bug, fixed March 2026).
+\end{warningbox}
+
+% =============================================================================
+\section{Threshold Calibration}
+% =============================================================================
+
+\subsection{Noise power distribution}
+
+\texttt{generate\_power\_dualpol.py} runs the full beamforming chain on the
+pre-generated noise files (0.5\,s) and outputs per-frame power values for
+LHCP and RHCP.  At boresight $(\phi=0°, \theta=-30°)$ with $N_\mathrm{ant}=4$
+and no signal, the mean power per frame for the first-filter configuration is:
+\[
+  \langle P_\mathrm{noise}^{f1} \rangle
+    = N_\mathrm{ant} \cdot \sigma_{f1}^2
+    = 4 \times 0.852^2
+    \approx 2.90.
+\]
+For the second-filter configuration:
+\[
+  \langle P_\mathrm{noise}^{f2} \rangle
+    = N_\mathrm{ant} \cdot \sigma_{f2}^2
+    = 4 \times 0.592^2
+    \approx 1.40.
+\]
+This is consistent with the debug print during the SNR scan showing
+$\mathrm{pow} \approx 3.3$ and $\mathrm{pow} \approx 1.7$ at low SNR
+(including the signal term even at SNR $= 0.2$).
+
+\subsection{False-rate curve fit}
+
+\texttt{generate\_threshold\_curves\_dualpol.py} scans threshold $T$ and
+counts the fraction of frames exceeding $T$, converting to a rate using the
+frame step time $\Delta t_\mathrm{frame} = S / f_s = 10$\,ns.  The dependence
+is fit to:
+\[
+  R(T) = A\,e^{-BT}.
+\]
+
+\subsection{Global rate constraint and threshold solving}
+
+The global coincidence rate with $N_\mathrm{beams}$ independent beams is:
+\[
+  R_\mathrm{global} = N_\mathrm{beams} \cdot R_\mathrm{coinc/beam},
+  \qquad
+  R_\mathrm{coinc/beam} = 2\,R_L(T)\,R_R(T)\,\tau,
+\]
+where $\tau = 20$\,ns is the coincidence window (set at threshold generation
+time) and the factor 2 comes from the Poisson approximation for two
+independent processes.  For $N_\mathrm{beams} = 63$ (from
+\texttt{plots/optimal\_beams\_sprint6.npy}) and a target of 0.1\,Hz:
+
+\begin{codebox}
+\begin{Verbatim}
+# generate_threshold_curves_dualpol.py
+tau_s         = args.coincidence_window * 1e-9    # 20 ns -> 2e-8 s
+target_per_beam = target / args.n_beams           # 0.1 / 63 = 1.587e-3 Hz
+# Symmetric solution: T_L = T_R = T
+# 2 * A^2 * tau * exp(-2*B*T) = target_per_beam
+# => T = -ln(target_per_beam / (2*A_L*A_R*tau)) / (B_L + B_R)
+arg  = target_per_beam / (2 * A_lhcp * A_rhcp * tau_s)
+T_sym = -numpy.log(arg) / (B_lhcp + B_rhcp)
+\end{Verbatim}
+\end{codebox}
+
+Results for $0.1$\,Hz global rate:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Configuration & $T$ (power units) & $\sigma_{f1}$ referred \\
+\midrule
+filt1 (1.5\,GHz) & 5.006 & $\approx 1.31\,\sigma_\mathrm{beam}$ \\
+filt2 (750\,MHz) & 2.981 & $\approx 1.31\,\sigma_\mathrm{beam}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The thresholds are different in absolute units but represent the same
+statistical operating point because the noise floor they are measured against
+is different ($\sigma_{f2} < \sigma_{f1}$).
+
+% =============================================================================
+\section{S-Curve Generation}
+% =============================================================================
+
+\subsection{Monte Carlo loop}
+
+\texttt{snr\_scan\_dualpol.run\_snr\_scan\_dualpol} iterates over an SNR grid
+and, for each point, runs $N_\mathrm{trials} = 1000$ independent signal+noise
+trials. For each trial:
+
+\begin{enumerate}
+  \item Extract a random $N_\mathrm{samp}$-sample noise segment (same start
+        index for all 4 antennas in that trial, independent draw per trial).
+  \item Scale the signal template and add noise:
+        $v_\mathrm{ant}^{H,V}(t) = s \cdot w_\mathrm{ant}^{H,V}(t) + n_\mathrm{ant}^{H,V}(t)$.
+  \item Run \texttt{coherentSum\_dualpol} $\to$ \texttt{powerSum} $\to$
+        compare against threshold.
+  \item Record LHCP hit, RHCP hit, and coincidence hit.
+\end{enumerate}
+
+\begin{codebox}
+\begin{Verbatim}
+# snr_scan_dualpol.py -- inner trial loop
+sig_scale   = snr * 2 * noise_rms        # noise_rms = sigma_f1
+injected_h  = waveforms_h * sig_scale + event_noise_h
+injected_v  = waveforms_v * sig_scale + event_noise_v
+
+lhcp, rhcp, _ = trigger.coherentSum_dualpol(
+    injected_h, injected_v, timebase, delays_array,
+    downsample=True, apply_filter=True, digitize_first=True,
+    apply_second_filter=apply_second_filter,
+    fc_second=payload.FC_SECOND_FILTER,
+    output='circular'
+)
+
+power_lhcp, _ = trigger.powerSum(lhcp, window=window, step=step)
+power_rhcp, _ = trigger.powerSum(rhcp, window=window, step=step)
+# NO division by n_ant here
+
+max_lhcp = np.max(power_lhcp)
+max_rhcp = np.max(power_rhcp)
+
+lhcp_triggered = max_lhcp > threshold_lhcp
+rhcp_triggered = max_rhcp > threshold_rhcp
+
+if lhcp_triggered:  hits_lhcp += 1
+if rhcp_triggered:  hits_rhcp += 1
+
+# Coincidence: frame-by-frame AND gate
+if lhcp_triggered and rhcp_triggered:
+    coinc_frames = (power_lhcp > threshold_lhcp) & (power_rhcp > threshold_rhcp)
+    if np.any(coinc_frames):
+        hits_coinc += 1
+\end{Verbatim}
+\end{codebox}
+
+\subsection{Trigger logic}
+
+\subsubsection{Single-polarization trigger}
+
+An event is flagged as LHCP-triggered if the maximum power over all frames
+exceeds the threshold:
+\[
+  \mathtt{lhcp\_triggered} = \max_k P_\mathrm{LHCP}[k] > T_{f1}.
+\]
+
+\subsubsection{Coincidence trigger}
+
+\textbf{Current implementation (frame-by-frame AND):} An event passes
+coincidence if there exists at least one frame $k$ where both channels
+simultaneously exceed threshold:
+\[
+  \mathtt{coinc} = \exists\,k:\;
+  P_\mathrm{LHCP}[k] > T \;\wedge\; P_\mathrm{RHCP}[k] > T.
+\]
+
+\begin{warningbox}
+\textbf{Do not use argmax-based coincidence for LHCP/RHCP.}
+An earlier implementation found the peak frame index in each channel
+independently and checked whether those frame indices differed by less than
+$\tau_\mathrm{coinc}$ in time.  This is incorrect here because LHCP and RHCP
+are derived from the same beamformed H-pol and V-pol streams --- there is no
+physical time offset between them.  The argmax can differ between LHCP and
+RHCP due to noise, especially when the 750\,MHz filter disperses the impulse
+response over more frames (the peak is lower and broader), causing the per-channel
+noise fluctuations to shift the argmax index away from the true signal peak.
+This produced a spurious coincidence efficiency plateau at $\sim$50--70\% at
+high SNR for the second-filter configuration (old bug, fixed March 2026).
+\end{warningbox}
+
+\subsubsection{Why LHCP and RHCP are derived from the same array}
+
+The circular decomposition is done on the coherently beamformed H and V
+streams, which come from the same antenna array observing the same sky
+direction in the same time window.  There is therefore no geometrically
+induced time offset between LHCP and RHCP; any apparent timing difference is
+purely due to noise.
+
+% =============================================================================
+\section{Filter Comparison}
+% =============================================================================
+
+\subsection{What the second filter does}
+
+The 750\,MHz lowpass is applied per-antenna after the 1.5\,GHz first filter.
+Its effect on the impulse response is negligible ($V_{pp}$ is unchanged; all
+impulse energy is already below 750\,MHz), but the noise RMS drops by a
+further factor of $\approx 0.695$ (ratio $\sigma_{f2}/\sigma_{f1}$,
+consistent with $\sqrt{750/1500} = 0.707$).
+
+This means that at the same per-antenna SNR (defined via $\sigma_{f1}$), the
+signal-to-noise ratio in the power domain improves by:
+\[
+  \frac{(V_{pp}^{f2}/\sigma_{f2})^2}{(V_{pp}^{f1}/\sigma_{f1})^2}
+  = \left(\frac{\sigma_{f1}}{\sigma_{f2}}\right)^2
+  \approx \left(\frac{0.852}{0.592}\right)^2
+  \approx 2.07.
+\]
+This\textasciitilde{}2$\times$ improvement in power SNR corresponds to about
+$\sqrt{2} \approx 1.44\times$ lower SNR required for a given detection
+probability.
+
+\subsection{Why this improvement does not show up as an x-axis shift on the S-curve}
+
+Because the SNR axis is defined in $\sigma_{f1}$ units, the filter improvement
+is fully captured in the threshold value (2.981 vs.\ 5.006).  Therefore the
+S-curve for filt2 occupies approximately the same x-axis range as filt1; the
+\emph{performance improvement is expressed as a lower threshold at the same
+false rate}, not as a leftward shift of the S-curve.
+
+\subsection{How to present both curves with a visible leftward shift}
+
+To show the filt2 improvement as a leftward shift on the same axes, rescale
+the filt2 x-axis values so that the denominator changes from $\sigma_{f1}$ to
+$\sigma_{f2}$:
+
+\[
+  \mathrm{SNR}_{f2\text{-axis}} = \mathrm{SNR}_{f1\text{-axis}} \times \frac{\sigma_{f2}}{\sigma_{f1}}
+  \approx \mathrm{SNR}_{f1\text{-axis}} \times 0.695.
+\]
+
+\noindent Conceptually: the filt2 scan injects signal at amplitude
+$s = \mathrm{SNR} \times 2\sigma_{f1}$, but the filt2 system's own noise floor
+is $\sigma_{f2}$. So the \emph{effective} per-antenna SNR as seen by the filt2
+system is:
+\[
+  \frac{s}{2\sigma_{f2}} = \mathrm{SNR}_{f1\text{-axis}} \times \frac{\sigma_{f1}}{\sigma_{f2}}
+  \approx \mathrm{SNR}_{f1\text{-axis}} \times 1.44.
+\]
+Re-expressing the filt2 x-axis in these native units compresses it by
+$\sigma_{f2}/\sigma_{f1} \approx 0.695$, shifting the curve leftward by
+$\approx 1.44\times$.
+
+In Python, given \texttt{snr\_arr} is the common SNR array from the scan:
+
+\begin{codebox}
+\begin{Verbatim}
+sigma_f1 = 0.852  # measured
+sigma_f2 = 0.592  # measured
+
+# filt1 curve: x-axis unchanged
+ax.plot(snr_arr, eff_coinc_f1, label='filt1 (1.5 GHz)')
+
+# filt2 curve: rescale x-axis to filt2 native SNR units
+snr_arr_f2 = snr_arr * (sigma_f2 / sigma_f1)   # ~ 0.695 * snr_arr
+ax.plot(snr_arr_f2, eff_coinc_f2, label='filt2 (750 MHz, sigma_f2 axis)')
+
+ax.set_xlabel(r'per-antenna $V_{pp} / (2\sigma)$ [own filter reference]')
+\end{Verbatim}
+\end{codebox}
+
+The two curves will then cross the 50\,\% line at different x positions
+($\approx 1.25$ for filt1 vs.\ $\approx 0.9$ for filt2), making the gain from
+the second filter visually apparent.  The trade-off is that the two curves now
+have \emph{different} x-axis denominators, so the plot does not directly answer
+``at what injected amplitude does each system trigger?'' --- it answers ``how
+many multiples of each system's own noise floor are needed?''
+
+\begin{notebox}
+The choice of presentation depends on the audience.  A \emph{common} $\sigma_{f1}$
+axis (what the scan currently produces) is most useful when comparing with a
+fixed injected signal level (e.g.\ a real event of known voltage). The
+\emph{rescaled} presentation is most useful for comparing the intrinsic
+sensitivity of two filter configurations on equal footing.  Both are physically
+correct.
+\end{notebox}
+
+% =============================================================================
+\section{Known Bugs and Fixes (History)}
+% =============================================================================
+
+\begin{description}[style=nextline]
+
+\item[Power normalized by $N_\mathrm{ant}$ (March 2026 fix)]
+The SNR scan divided \texttt{power\_lhcp} and \texttt{power\_rhcp} by
+$N_\mathrm{ant} = 4$ before comparing to the threshold.  The threshold JSON
+values are calibrated on un-normalized beamformed noise power (from
+\texttt{generate\_power\_dualpol.py}, which never normalizes).  Dividing the
+scan power by 4 made the effective threshold 4$\times$ too stringent,
+requiring about $4\times$ more signal power (i.e.\ $2\times$ more SNR on the
+voltage axis) to trigger. This inflated the 50\,\% efficiency point from
+$\approx$\,SNR\,1.25 to $\approx$\,SNR\,5--6. The comment in the code claimed
+the normalization was needed to express signal relative to a single-antenna
+threshold, which was wrong: the thresholds are already set for a
+4-antenna beamformed system.
+
+\item[SNR reference used raw noise RMS $\sigma_\mathrm{raw} \approx 1.0$ (March 2026 fix)]
+Early versions used the full-band noise RMS as the injection reference.  Since
+$\sigma_\mathrm{raw} \approx 1.0$ and $V_{pp} = 1$, this accidentally produced
+$s \approx 2 \times 1 = 2.0$ at SNR $= 1$, injecting more power than intended
+relative to the filter-limited noise floor.  Changing to $\sigma_{f1}$ gives a
+physically meaningful SNR that corresponds to what the hardware ADC samples
+after the analog anti-aliasing filter.
+
+\item[Argmax-based coincidence window for LHCP/RHCP (March 2026 fix)]
+The coincidence check found the time of the peak power frame independently for
+LHCP and RHCP and required them to agree within $\tau_\mathrm{coinc}$.  With
+the 750\,MHz second filter, the impulse is dispersed over $\sim$5--7 frames
+with a flatter peak; noise fluctuations then shift the argmax within the
+trigger window, causing LHCP and RHCP to report different peak times even
+though both channels were triggered by the same physical signal.  This produced
+a coincidence efficiency plateau at $\sim$50--70\,\% at high SNR for the
+second-filter configuration. The fix is to use a frame-by-frame AND gate,
+which checks whether any single frame simultaneously exceeds threshold in both
+channels.
+
+\item[Hard-coded \texttt{xlim=[0,100]} in \texttt{payload\_signal.py} panel 10d]
+The power-sum step plot was displayed with a fixed x-axis of 0--100\,ns.  The
+actual number of visible power frames (each 10\,ns wide) was different, so the
+annotation counts for threshold-crossing frames did not match the visible
+display. Fixed by computing the x-axis extent dynamically.
+
+\item[Step plot missing last frame (\texttt{where='post'})]
+A step plot with $N$ frame timestamps and \texttt{where='post'} only renders
+$N-1$ visible bars (the last bar has no ``next'' timestamp to define its right
+edge).  Fixed by appending a closing timestamp at
+$t_\mathrm{last} + \Delta t_\mathrm{step}$.
+
+\item[n\_beams defaulted to 100]
+The threshold generation script defaulted to $N_\mathrm{beams} = 100$ as a
+placeholder. The actual number from the beam optimization is 63 (from
+\texttt{plots/optimal\_beams\_sprint6.npy}).  Added \texttt{--beam-data-file}
+argument that reads this value automatically.
+
+\end{description}
+
+% =============================================================================
+\section{Numerical Summary of Key Constants}
+\label{sec:constants}
+% =============================================================================
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Quantity & Value & Source \\
+\midrule
+ADC sample rate $f_s$ & 4\,GHz & \texttt{tools/CoRaLs\_geometry.py} \\
+ADC sample step $\Delta t$ & 0.25\,ns & \\
+First filter cutoff $f_{c,1}$ & 1.5\,GHz & Shannon-Whitaker FIR \\
+Second filter cutoff $f_{c,2}$ & 750\,MHz & Shannon-Whitaker FIR \\
+Power window $W$ & 160 samples = 40\,ns & \\
+Power step $S$   & 40 samples = 10\,ns  & \\
+Coincidence window $\tau_\mathrm{coinc}$ (threshold gen.) & 20\,ns & \\
+$N_\mathrm{beams}$ & 63 & \texttt{plots/optimal\_beams\_sprint6.npy} \\
+Target global rate & 0.1\,Hz & \\
+\midrule
+$\sigma_\mathrm{raw}$ (per-antenna, pre-filter) & $\approx 0.999$ & measured \\
+$\sigma_{f1}$ (per-antenna, post 1.5\,GHz filter) & $\approx 0.852$ & measured \\
+$\sigma_{f2}$ (per-antenna, post 750\,MHz filter)  & $\approx 0.592$ & measured \\
+$V_{pp}$ after \texttt{prepImpulse} & 1.0 (exact) & normalized \\
+$V_{pp}$ after filt1 per antenna & $\approx 1.000$ & measured \\
+$V_{pp}$ after filt2 per antenna & $\approx 1.000$ & measured \\
+\midrule
+Threshold $T_{f1}$ (filt1, 0.1\,Hz) & 5.006 & fitted \\
+Threshold $T_{f2}$ (filt2, 0.1\,Hz) & 2.981 & fitted \\
+\midrule
+SNR\,50\% coinc efficiency (filt1) & $\approx 1.25$ & scan \\
+SNR\,50\% coinc efficiency (filt2) & $\approx 1.30$ & scan \\
+SNR\,100\% coinc efficiency (both) & $\approx 1.8$ & scan \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =============================================================================
+\section{Running the Full Chain}
+% =============================================================================
+
+\begin{codebox}
+\begin{Verbatim}
+# 1. Generate noise (run once; ~0.5 s of data, ~16 GB on disk)
+python generate_dualpol_noise_chunked.py --duration 0.5 --chunk-duration 0.01
+
+# 2. Generate beamformed noise power files (filt1 only)
+python generate_power_dualpol.py --window 160 --step 40
+
+# 2b. And with second filter
+python generate_power_dualpol.py --window 160 --step 40 \
+    --apply-second-filter --suffix "_filt2_750MHz"
+
+# 3. Calibrate thresholds (filt1)
+python generate_threshold_curves_dualpol.py \
+    --beam-data-file plots/optimal_beams_sprint6.npy \
+    --window 160 --step 40 \
+    --target-rate 0.1 1.0
+
+# 3b. Calibrate thresholds (filt2)
+python generate_threshold_curves_dualpol.py \
+    --beam-data-file plots/optimal_beams_sprint6.npy \
+    --window 160 --step 40 \
+    --suffix "_filt2_750MHz" \
+    --target-rate 0.1 1.0
+
+# 4. Run S-curve comparison
+python snr_scan_dualpol.py \
+    --filter-scan \
+    --threshold-json noise/threshold_analysis_dualpol.json \
+    --filt2-threshold-json noise/threshold_analysis_dualpol_filt2_750MHz.json \
+    --threshold-index 0
+\end{Verbatim}
+\end{codebox}
+
+\end{document}

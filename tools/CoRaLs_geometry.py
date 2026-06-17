@@ -1,228 +1,294 @@
 import numpy as np
 
-num_phi_sectors = 8
-num_skirt_rings = 0 # nothing like this yet in Corals sim
-num_top_rings = 0 # probably should be 1 top ring and 1 bottom ring, but the entire idea of "phi" sectors in ANITA is that antennas from multiple rings will have same phi for triggering purposes. 
-#num_antennas = num_phi_sectors * (num_top_rings + num_skirt_rings)
-num_antennas=8 # for corals, set to 8 antennas
+# 8 channels: 4 physical antennas × 2 pols (H,V)
+# Channels 0-3: H-pol, Channels 4-7: V-pol
+num_antennas = 8
 
-#antenna names / array organization
-# Choice of convention, start with a "top" ring antenna as phi sector (but i starts at 0 in for loop below so it looks wrong but it aint)
-phisector=[]
-loc=[]
-for i in range(num_phi_sectors):
-    if i % 2 == 0:
-        loc.append('T')
-    else: 
-        loc.append('B')
-    phisector.append(i+1)
+ritc_sample_rate = 4  # GHz
+ritc_sample_step = 1/ritc_sample_rate  # ns
 
+# Antenna positions in x-z plane (y=0)
+span = 2
+d = span/(2*np.sqrt(2))  # d = 1/√2 ≈ 0.707 m
+xpos = [0, 0,  0,  0,  0, 0,  0,  0]
+ypos = [d, d, -d, -d,  d, d, -d, -d]
+zpos = [d, -d, -d, d,  d, -d, -d, d]
 
+phi_tilt   = [0, 0, 0, 0,   # H-pol boresight pointing (phi)
+              0, 0, 0, 0]   # V-pol
+theta_tilt = [0, 0, 0, 0,   # H-pol boresight pointing (theta)
+              0, 0, 0, 0]   # V-pol
 
-#azimuthal direction of antennas, degrees
-#phi_ant  = np.tile(np.arange(0., 360., 360./num_phi_sectors), 4)
-
-# this is the whole array
-# but the existing code needs these positions to be in the order of the declared phi-sectors locations above. Otherwise, user-interfaces with phisectors calls are completely wrong.
-# original arrays
-#xpos = [ 7.5,    0, -7.5,    0,  5.6, 5.6, -5.6, -5.6]
-#ypos = [   0,  7.5,    0, -7.5, -5.6, 5.6,  5.6, -5.6]
-#zpos = [-1.3, -1.3, -1.3, -1.3,   -8,  -8,   -8,   -8]
-xpos      = [ 7.5,  5.6,    0, -5.6, -7.5, -5.6,    0,  5.6]
-ypos      = [   0,  5.6,  7.5,  5.6,    0, -5.6, -7.5, -5.6]
-zpos      = [-1.3,   -8, -1.3,   -8, -1.3,   -8, -1.3,   -8] 
-#real
-phi_tilt   = [   0,   45,   90,  135,  180, -135,  -90,  -45]
-theta_tilt = [ -30,  -60,  -30,  -60,  -30,  -60,  -30,  -60]
-#make them all the same
-#phi_tilt   = [   45,   45,   45,  45,  45, 45,  45,  45]
-#theta_tilt = [ -30,  -30,  -30,  -30,  -30,  -30,  -30,  -30]
+x_ant = np.array(xpos)
+y_ant = np.array(ypos)
 z_ant = np.array(zpos)
-x_ant = np.array(xpos) # Antenna x positions (m)
-y_ant = np.array(ypos) # Antenna y positions (m)
-r_list = []
-i=0
-while i<len(x_ant):
-    r_list.append(np.sqrt(x_ant[i]**2+y_ant[i]**2+z_ant[i]**2))#in x y plane is just the sqrt x**2+y**2
-    i+=1
-r_ant=np.array(r_list)
-#antenna tilt angle: theta, degrees
-#theta_ant=-10.*np.ones(len(z_ant))
-# tilt angles from peter's matlab scripts
-phi_ant=np.array(phi_tilt)
-theta_ant=np.array(theta_tilt)
+r_ant = np.sqrt(x_ant**2 + y_ant**2 + z_ant**2)
+phi_ant = np.array(phi_tilt)
+theta_ant = np.array(theta_tilt)
 
-#normal_az = [0  90 180 -90 -45 45 135 -135];
-#normal_el = [-30 -30 -30 -30 -60 -60 -60 -60];
-
-
-#xpos = [   0, 5.6,  7.5,  5.6,    0,    0, 5.6,  7.5,  5.6,    0]
-#ypos = [ 7.5, 5.6,    0, -5.6, -7.5,  7.5, 5.6,    0, -5.6, -7.5]
-#zpos = [-1.3,  -8, -1.3,   -8, -1.3, -1.3,  -8, -1.3,   -8, -1.3]
-center_x=np.sum(x_ant)/len(x_ant)
-center_y=np.sum(y_ant)/len(y_ant)
-center_z=np.sum(z_ant)/len(z_ant)
-#ritc_sampling
-ritc_sample_rate = 2.6 #GHz
-ritc_sample_step = 1./ritc_sample_rate #ns
+center_x = np.mean(x_ant[:4])  # Use first 4 positions for center
+center_y = np.mean(y_ant[:4])
+center_z = np.mean(z_ant[:4])
 
 def drawPayload(incoming_wave=False, phi=0, theta=0):
-    import myplot    
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
 
-    fig = plt.figure(figsize=(16,16))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(xpos, ypos, zpos, marker='v', color='gray', alpha=.7, s=120)
-    ax.text(center_x, center_y, center_z, '*', fontsize=12)
-    l=0
-    while l < len(loc):
-        ax.text(xpos[l], ypos[l], zpos[l], loc[l], fontsize=12)
-        ax.text(xpos[l]+0.5, ypos[l]+0.5, zpos[l]+0.5, str(l+1), fontsize=12)
-        l+=1
-    if (incoming_wave):
-            r=r_ant[0]
-            x_planewave = r* np.cos(np.radians(theta)) * np.cos(np.radians(phi))
-            y_planewave = r* np.cos(np.radians(theta)) * np.sin(np.radians(phi))
-            #z_planewave = (-0.5* r) +r* np.sin(np.radians(theta))
-            z_planewave = r* np.sin(np.radians(theta))
-            if(theta==0):
-                z_planewave=0
-            ax.quiver( x_planewave, y_planewave, z_planewave, # <-- starting point of vector
-                90-phi, phi, theta, #  directions of vector in degrees
-                color = 'red', alpha = .8, lw = 0.3)
-    plt.xlabel('x [m]')
-    plt.ylabel('y [m]')
-    #plt.zlabel('z [m]')
+    fig = plt.figure(figsize=(14, 7))
+    
+    # 3D view
+    ax = fig.add_subplot(121, projection='3d')
+    
+    ax.scatter(xpos[:4], ypos[:4], zpos[:4], marker='^', color='blue', s=300, 
+               alpha=0.8, edgecolors='black', linewidth=2, label='H-pol')
 
-    plt.figure(figsize=(6,8))
-    plt.plot(xpos, zpos, 'v', color='gray', ms=30, alpha=.3)
-    l=0
-    while l < len(loc):
-        plt.text(xpos[l], zpos[l], loc[l], fontsize=12)
-        plt.text(xpos[l]+0.5, zpos[l]+0.5, str(l+1), fontsize=12)
-        l+=1
-    plt.xlabel(' x [m]')
-    plt.ylabel(' z [m]')
-    #plt.ylim([-8, 1])
+    ax.scatter(xpos[4:], ypos[4:], zpos[4:], marker='s', color='red', s=200, 
+               alpha=0.6, edgecolors='black', linewidth=2, label='V-pol')
+    
+    arrow_length = 0.5
+    for i in range(4):
+        theta_rad = np.radians(theta_ant[i])
+        phi_rad = np.radians(phi_ant[i])
+        dx = np.cos(theta_rad) * np.cos(phi_rad)
+        dy = np.cos(theta_rad) * np.sin(phi_rad)
+        dz = np.sin(theta_rad)
+        ax.quiver(xpos[i], ypos[i], zpos[i], dx*arrow_length, dy*arrow_length, dz*arrow_length,
+                 color='green', arrow_length_ratio=0.3, linewidth=2)
+        ax.text(xpos[i], ypos[i], zpos[i]+0.3, f'Ch{i}(H)\nCh{i+4}(V)', 
+                fontsize=10, fontweight='bold', ha='center')
+    
+    ax.scatter([center_x], [center_y], [center_z], marker='*', color='red', s=400, label='Center')
+    
+    if incoming_wave:
+        r = 2.5
+        x_planewave = r * np.cos(np.radians(theta)) * np.cos(np.radians(phi))
+        y_planewave = r * np.cos(np.radians(theta)) * np.sin(np.radians(phi))
+        z_planewave = r * np.sin(np.radians(theta))
+        
+        ax.quiver(0, 0, 1, x_planewave, y_planewave, z_planewave-1,
+                 color='red', arrow_length_ratio=0.2, linewidth=3, alpha=0.7, label=f'Wave φ={phi}°, θ={theta}°')
+    
+    ax.set_xlabel('X [m]', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Y [m]', fontsize=12, fontweight='bold')
+    ax.set_zlabel('Z [m]', fontsize=12, fontweight='bold')
+    ax.set_title('3D Antenna Array', fontsize=14, fontweight='bold')
+    
+    max_range = 2.5
+    ax.set_xlim([-max_range, max_range])
+    ax.set_ylim([-max_range, max_range])
+    ax.set_zlim([-1, max_range])
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # 2D side view (x-z plane)
+    ax2 = fig.add_subplot(122)
+    ax2.scatter(xpos, zpos, marker='^', color='blue', s=300, alpha=0.8, edgecolors='black', linewidth=2)
+    
+    for i in range(num_antennas):
+        theta_rad = np.radians(theta_ant[i])
+        phi_rad = np.radians(phi_ant[i])
+        dx = np.cos(theta_rad) * np.cos(phi_rad)
+        dz = np.sin(theta_rad)
+        ax2.arrow(xpos[i], zpos[i], dx*arrow_length, dz*arrow_length,
+                 head_width=0.2, head_length=0.1, fc='green', ec='green', linewidth=2)
+        ax2.text(xpos[i], zpos[i]+0.15, f'A{i+1}', fontsize=12, fontweight='bold', ha='center')
+    
+    ax2.axhline(y=0, color='k', linestyle='--', alpha=0.3, linewidth=1)
+    ax2.axvline(x=0, color='k', linestyle='--', alpha=0.3, linewidth=1)
+    ax2.set_xlabel('X [m]', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('Z [m]', fontsize=12, fontweight='bold')
+    ax2.set_title('Side View (X-Z Plane)', fontsize=14, fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+    ax2.set_aspect('equal')
+    ax2.set_ylim([-1, 0.5])
+    
+    plt.tight_layout()
     plt.show()
 
-def drawPayloadWavefront(incoming_wave=False, phi=0, theta=0):
-    import myplot    
+
+
+def drawWavefrontPlanes(incoming_wave=False, phi=0, theta=0, show_labels=True):
     import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-
-    fig = plt.figure(figsize=(16,16))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(xpos, ypos, zpos, marker='v', color='gray', alpha=.7, s=120)
-    ax.text(center_x, center_y, center_z, '*', fontsize=12)
-    l=0
-    while l < len(loc):
-        ax.text(xpos[l], ypos[l], zpos[l], loc[l], fontsize=12)
-        ax.text(xpos[l]+0.5, ypos[l]+0.5, zpos[l]+0.5, str(l+1), fontsize=12)
-        l+=1
-        r=1
-        x_planewave = r* np.cos(np.radians(theta)) * np.cos(np.radians(phi))
-        y_planewave = r* np.cos(np.radians(theta)) * np.sin(np.radians(phi))
-        #z_planewave = (-0.5* r) +r* np.sin(np.radians(theta))
-        z_planewave = r* np.sin(np.radians(theta))
-        if(theta==0):
-            z_planewave=0
-        u, v = np.mgrid[0:2*np.pi:30j, 0:np.pi:20j]
-        x = np.abs(1-r_ant[0])*x_planewave + np.cos(u) * np.sin(v)
-        y = np.abs(1-r_ant[0])*y_planewave + np.sin(u) * np.sin(v)
-        z = np.abs(1-r_ant[0])*z_planewave + np.cos(v)
-            
-
-    plt.xlabel('x [m]')
-    plt.ylabel('y [m]')
-    #plt.zlabel('z [m]')
-
-    plt.figure(figsize=(6,8))
-    for idx,x in enumerate(xpos):
-        plt.plot(xpos[idx], ypos[idx], marker=(3,0,phi_tilt[idx] -90), color='gray', ms=30, alpha=.3)
-    #plt.plot(xpos, zpos, 'v', color='gray', ms=30, alpha=.3)
-    l=0
-    while l < len(loc):
-        plt.text(xpos[l], ypos[l], loc[l], fontsize=12)
-        plt.text(xpos[l]+0.5, ypos[l]+0.5, str(l+1), fontsize=12)
-        l+=1
-    plt.xlabel(' x [m]')
-    plt.ylabel(' z [m]')
-    ax.plot_surface(x, y, z, cmap=plt.cm.YlGnBu_r)
-    print("(x,y,z)=({},{},{})".format(x_planewave,y_planewave,z_planewave))
-    ax.plot([0,r_ant[0]*x_planewave],[0,r_ant[0]*y_planewave],zs=[0,r_ant[0]*z_planewave])
-    #plt.ylim([-8, 1])
-    plt.show()
-
-def drawWavefrontPlanes(incoming_wave=False, phi=0, theta=0):
-    import myplot    
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    r=1
-    x_planewave = r* np.cos(np.radians(theta)) * np.cos(np.radians(phi))
-    y_planewave = r* np.cos(np.radians(theta)) * np.sin(np.radians(phi))
-    #z_planewave = (-0.5* r) +r* np.sin(np.radians(theta))
-    z_planewave = r* np.sin(np.radians(theta))
-    if(theta==0):
-        z_planewave=0
-    fig = plt.figure(figsize=(12,12))
-    ax1 = fig.add_subplot(221)
-    ax2 = fig.add_subplot(222)
-    ax3 = fig.add_subplot(223)
-    for idx,x in enumerate(xpos):
-        #for rotation of the triangle markers in the respective views, its important to note that degrees is units, and 0 degrees is △ (or upward pointing trianlge)
-        # -90 degrees is Clockwise rotation of triangle, pointing right ▷
-        #ax1.scatter(xpos[idx], ypos[idx], marker=(3,0,phi_tilt[idx] -90), color='gray', s=150, alpha=.3)
-        #ax1.scatter(xpos[idx], ypos[idx], marker=(3,0,-150), color='gray', s=150, alpha=.3)
-        ax1.arrow(xpos[idx],ypos[idx],np.cos(np.radians(phi_tilt[idx])),np.sin(np.radians(phi_tilt[idx])),
-                  head_width=0.75, head_length=0.1, fc='k', ec='k')
-        print("x-y angle: {}, triangle angle is: {}".format(phi_tilt[idx],phi_tilt[idx] -90))
-        ax1.arrow(0, 0, r_ant[0]*x_planewave,r_ant[0]*y_planewave, head_width=0.75, head_length=0.1, fc='k', ec='k')
-        # x-z plane has tan Psi=z/x
-        # use angle Psi for unit vectors to show pointing in x-z plane
-        # z_c = sin (psi)
-        # x_c = cos(psi)
-        psi=np.arctan( np.tan(np.radians(theta_tilt[idx])) / np.cos( np.radians(phi_tilt[idx]) ) )
-        if(np.abs(phi_tilt[idx]) >90):
-           psi+=np.pi
-        dx=np.cos(psi)
-        dz=np.sin(psi)
-        ax2.arrow(xpos[idx],zpos[idx],dx,dz, head_width=0.75, head_length=0.1, fc='k', ec='k')
-
-        # y-z plane has tan Psi=z/y
-        # use angle Psi for unit vectors to show pointing in y-z plane
-        # z_c = sin (psi)
-        # y_c = cos(psi)
-        psi=np.arctan( np.tan(np.radians(theta_tilt[idx])) / np.sin( np.radians(phi_tilt[idx]) ) )
-        if(phi_tilt[idx] >180 or phi_tilt[idx]<0):
-           psi+=np.pi
-        dy=np.cos(psi)
-        dz=np.sin(psi)
-        ax3.arrow(ypos[idx],zpos[idx],dy,dz, head_width=0.75, head_length=0.1, fc='k', ec='k')
-
-        ax1.text(xpos[idx], ypos[idx], loc[idx], fontsize=12)
-        ax1.text(xpos[idx]+0.5, ypos[idx]+0.5, str(idx+1), fontsize=12)
-        ax2.text(xpos[idx], zpos[idx], loc[idx], fontsize=12)
-        ax2.text(xpos[idx]+0.5+idx*0.2, zpos[idx]-0.5, str(idx+1), fontsize=12)
-        ax3.text(ypos[idx], zpos[idx], loc[idx], fontsize=12)
-        ax3.text(ypos[idx]+0.5+idx*0.2, zpos[idx]-0.5, str(idx+1), fontsize=12)
-    #plt.plot(xpos, zpos, 'v', color='gray', ms=30, alpha=.3)
-#    l=0
-#    while l < len(loc):
-#        ax1.text(xpos[l], ypos[l], loc[l], fontsize=12)
-#        ax1.text(xpos[l]+0.5, ypos[l]+0.5, str(l+1), fontsize=12)
-#        l+=1
-    ax1.set_xlabel(' x [m]')
-    ax1.set_ylabel(' y [m]')
-    ax2.set_xlabel(' x [m]')
-    ax2.set_ylabel(' z [m]')
-    ax3.set_xlabel(' y [m]')
-    ax3.set_ylabel(' z [m]')
-    print("(x,y,z)=({},{},{})".format(x_planewave,y_planewave,z_planewave))
-    #plt.ylim([-8, 1])
+    from matplotlib.gridspec import GridSpec
+    
+    # Calculate wavefront direction
+    r = 1
+    x_planewave = r * np.cos(np.radians(theta)) * np.cos(np.radians(phi))
+    y_planewave = r * np.cos(np.radians(theta)) * np.sin(np.radians(phi))
+    z_planewave = r * np.sin(np.radians(theta))
+    
+    # Create figure with 2x2 layout
+    fig = plt.figure(figsize=(14, 12))
+    fig.suptitle(f'CoRaLS Antenna Array Geometry - Orthographic Projection\nWave: φ={phi}°, θ={theta}°', 
+                 fontsize=16, fontweight='bold')
+    
+    # Top view (x-y plane) - upper left
+    ax1 = fig.add_subplot(2, 2, 1)
+    for idx in range(num_antennas):
+        ax1.scatter(xpos[idx], ypos[idx], marker='^', color='blue', s=300, 
+                   alpha=0.8, edgecolors='black', linewidth=2)
+        if show_labels:
+            ax1.text(xpos[idx], ypos[idx]+0.25, f'A{idx+1}', fontsize=12, 
+                    fontweight='bold', ha='center')
+        # Draw pointing arrow (x-y projection)
+        theta_rad = np.radians(theta_ant[idx])
+        phi_rad   = np.radians(phi_ant[idx])
+        dx = np.cos(theta_rad) * np.cos(phi_rad)
+        dy = np.cos(theta_rad) * np.sin(phi_rad)
+        proj_mag = np.sqrt(dx**2 + dy**2)
+        if proj_mag > 1e-6:
+            ax1.arrow(xpos[idx], ypos[idx], dx*0.5, dy*0.5,
+                     head_width=0.18, head_length=0.1, fc='green', ec='green',
+                     linewidth=2, length_includes_head=True)
+    
+    # Draw square connecting antennas
+    square_x = [xpos[0], xpos[1], xpos[2], xpos[3], xpos[0]]
+    square_y = [ypos[0], ypos[1], ypos[2], ypos[3], ypos[0]]
+    ax1.plot(square_x, square_y, 'k--', alpha=0.3, linewidth=1)
+    
+    # Draw incoming wave direction (top view projection)
+    if incoming_wave:
+        scale = 1.5
+        ax1.arrow(0, 0, scale*x_planewave, scale*y_planewave, 
+                 head_width=0.25, head_length=0.15, fc='red', ec='red', 
+                 alpha=0.7, linewidth=2.5, label='Wave direction')
+    
+    ax1.scatter([0], [0], marker='*', color='red', s=300, zorder=10)
+    ax1.axhline(y=0, color='k', linestyle='--', alpha=0.2, linewidth=0.5)
+    ax1.axvline(x=0, color='k', linestyle='--', alpha=0.2, linewidth=0.5)
+    ax1.set_xlabel('X [m]', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('Y [m]', fontsize=12, fontweight='bold')
+    ax1.set_title('Top View (X-Y Plane)', fontsize=13, fontweight='bold')
+    ax1.grid(True, alpha=0.3)
+    ax1.set_aspect('equal')
+    ax1.legend(loc='upper right')
+    ax1.set_xlim([-2.5, 2.5])
+    ax1.set_ylim([-2.5, 2.5])
+    
+    # Front view (x-z plane) - lower left
+    ax2 = fig.add_subplot(2, 2, 3)
+    # Group antennas by x position to handle overlaps
+    x_groups = {}
+    for idx in range(num_antennas):
+        x_key = round(xpos[idx], 2)
+        if x_key not in x_groups:
+            x_groups[x_key] = []
+        x_groups[x_key].append(idx)
+    
+    for idx in range(num_antennas):
+        ax2.scatter(xpos[idx], zpos[idx], marker='^', color='blue', s=300,
+                   alpha=0.8, edgecolors='black', linewidth=2)
+        # Draw antenna pointing arrows (x-z projection)
+        theta_rad = np.radians(theta_ant[idx])
+        phi_rad = np.radians(phi_ant[idx])
+        dx = np.cos(theta_rad) * np.cos(phi_rad)
+        dz = np.sin(theta_rad)
+        ax2.arrow(xpos[idx], zpos[idx], dx*0.5, dz*0.5,
+                 head_width=0.2, head_length=0.08, fc='green', ec='green', linewidth=2)
+        
+        # Offset labels for antennas at same x position
+        if show_labels:
+            x_key = round(xpos[idx], 2)
+            if len(x_groups[x_key]) > 1:
+                offset_idx = x_groups[x_key].index(idx)
+                x_offset = -0.3 + offset_idx * 0.6  # Spread labels left and right
+                ax2.text(xpos[idx] + x_offset, zpos[idx]+0.12, f'A{idx+1}', fontsize=12, 
+                        fontweight='bold', ha='center')
+            else:
+                ax2.text(xpos[idx], zpos[idx]+0.12, f'A{idx+1}', fontsize=12, 
+                        fontweight='bold', ha='center')
+    
+    # Draw incoming wave direction (X-Z projection)
+    if incoming_wave:
+        # Normalize the X-Z projection to fit in plot
+        xz_mag = np.sqrt(x_planewave**2 + z_planewave**2)
+        if xz_mag > 0:
+            scale = 0.8  # Scale to fit nicely in the view
+            arrow_x = scale * (x_planewave / xz_mag)
+            arrow_z = scale * (z_planewave / xz_mag)
+            ax2.arrow(0, 0.3, arrow_x, arrow_z, 
+                     head_width=0.2, head_length=0.12, fc='red', ec='red', 
+                     alpha=0.7, linewidth=2.5, label='Wave direction')
+            ax2.legend(loc='upper right', fontsize=10)
+    
+    ax2.axhline(y=0, color='k', linestyle='-', alpha=0.4, linewidth=1)
+    ax2.axvline(x=0, color='k', linestyle='--', alpha=0.2, linewidth=0.5)
+    ax2.set_xlabel('X [m]', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('Z [m]', fontsize=12, fontweight='bold')
+    ax2.set_title('FRONT VIEW (X-Z Plane)', fontsize=13, fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+    ax2.set_aspect('equal', adjustable='box')
+    ax2.set_xlim([-2.5, 2.5])
+    ax2.set_ylim([-2.5, 2.5])
+    
+    # Side view (y-z plane) - upper right  
+    ax3 = fig.add_subplot(2, 2, 2)
+    # Group antennas by y position to handle overlaps
+    y_groups = {}
+    for idx in range(num_antennas):
+        y_key = round(ypos[idx], 2)
+        if y_key not in y_groups:
+            y_groups[y_key] = []
+        y_groups[y_key].append(idx)
+    
+    for idx in range(num_antennas):
+        ax3.scatter(ypos[idx], zpos[idx], marker='^', color='blue', s=300,
+                   alpha=0.8, edgecolors='black', linewidth=2)
+        # Draw antenna pointing arrows (y-z projection)
+        theta_rad = np.radians(theta_ant[idx])
+        phi_rad = np.radians(phi_ant[idx])
+        dy = np.cos(theta_rad) * np.sin(phi_rad)
+        dz = np.sin(theta_rad)
+        proj_mag = np.sqrt(dy**2 + dz**2)
+        if proj_mag > 1e-6:
+            ax3.arrow(ypos[idx], zpos[idx], dy*0.5, dz*0.5,
+                     head_width=0.2, head_length=0.08, fc='green', ec='green', linewidth=2)
+        else:
+            # Pointing direction is perpendicular to this plane (pure +X when phi=0, theta=0)
+            ax3.annotate('→X', xy=(ypos[idx], zpos[idx]), fontsize=9, color='green',
+                        ha='center', va='center', fontweight='bold')
+        
+        # Offset labels for antennas at same y position
+        if show_labels:
+            y_key = round(ypos[idx], 2)
+            if len(y_groups[y_key]) > 1:
+                offset_idx = y_groups[y_key].index(idx)
+                y_offset = -0.3 + offset_idx * 0.6  # Spread labels left and right
+                ax3.text(ypos[idx] + y_offset, zpos[idx]+0.12, f'A{idx+1}', fontsize=12, 
+                        fontweight='bold', ha='center')
+            else:
+                ax3.text(ypos[idx], zpos[idx]+0.12, f'A{idx+1}', fontsize=12, 
+                        fontweight='bold', ha='center')
+    
+    # Draw incoming wave direction (Y-Z projection)
+    if incoming_wave:
+        # Normalize the Y-Z projection to fit in plot
+        yz_mag = np.sqrt(y_planewave**2 + z_planewave**2)
+        if yz_mag > 0:
+            scale = 0.8  # Scale to fit nicely in the view
+            arrow_y = scale * (y_planewave / yz_mag)
+            arrow_z = scale * (z_planewave / yz_mag)
+            ax3.arrow(0, 0.3, arrow_y, arrow_z, 
+                     head_width=0.2, head_length=0.12, fc='red', ec='red', 
+                     alpha=0.7, linewidth=2.5, label='Wave direction')
+            ax3.legend(loc='upper right', fontsize=10)
+    
+    ax3.axhline(y=0, color='k', linestyle='-', alpha=0.4, linewidth=1)
+    ax3.axvline(x=0, color='k', linestyle='--', alpha=0.2, linewidth=0.5)
+    ax3.set_xlabel('Y [m]', fontsize=12, fontweight='bold')
+    ax3.set_ylabel('Z [m]', fontsize=12, fontweight='bold')
+    ax3.set_title('SIDE VIEW (Y-Z Plane)', fontsize=13, fontweight='bold')
+    ax3.grid(True, alpha=0.3)
+    ax3.set_aspect('equal', adjustable='box')
+    ax3.set_xlim([-2.5, 2.5])
+    ax3.set_ylim([-2.5, 2.5])
+    
+    plt.tight_layout()
+    plt.savefig('plots/geometry.png', dpi=150, bbox_inches='tight')
+    print(f"\nWavefront direction (unit vector): ({x_planewave:.3f}, {y_planewave:.3f}, {z_planewave:.3f})")
+    print(f"Plot saved to: plots/geometry.png")
     plt.show()
 
 if __name__=='__main__':
-    #drawPayload(incoming_wave=True, phi=30, theta=-80)
-    drawWavefrontPlanes(incoming_wave=True, phi=30, theta=-80)
+    drawWavefrontPlanes(incoming_wave=True, phi=30, theta=20, show_labels= False)
+    drawPayload(incoming_wave=False, phi=90, theta=0)
